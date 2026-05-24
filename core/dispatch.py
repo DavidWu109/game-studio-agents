@@ -1,15 +1,14 @@
 """Dispatch runner — execute a task YAML with dependency resolution.
 
 Usage:
-    python3 -m core.dispatch projects/gopoo/studio/tasks/gamepanel-fixes.yaml
+    python3 -m core.dispatch tasks.yaml [--dry] [--poll 30]
 
-The runner:
-1. Reads the YAML
-2. Finds tasks whose dependencies are satisfied
-3. Launches them via agent-specific handlers
-4. Updates task status in the YAML
-5. Repeats until all done or all blocked
-6. Sends Feishu notifications at each step
+Fixes from v0.7 dispatch (dispatch-issues-v2.md):
+1. Parallel execution via threading (not single-threaded)
+2. Explicit task_yaml field for art tasks (no guessing)
+3. Parse panel name from task input for QA
+4. Result validation before marking done
+5. --dangerously-skip-permissions with proper flag ordering
 """
 
 from __future__ import annotations
@@ -17,10 +16,12 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -42,6 +43,9 @@ GOPOO_CLIENT = Path(os.path.expanduser("~/Projects/go-poo-client"))
 # Phase 1: Task Status Persistence
 # ---------------------------------------------------------------------------
 
+_yaml_lock = threading.Lock()
+
+
 def load_dispatch(yaml_path: Path) -> dict:
     with yaml_path.open() as f:
         return yaml.safe_load(f)
@@ -54,18 +58,19 @@ def save_dispatch(yaml_path: Path, data: dict):
 
 def mark_status(yaml_path: Path, task_id: str, status: str,
                 result: str = "", error: str = ""):
-    data = load_dispatch(yaml_path)
-    for t in data["tasks"]:
-        if t["id"] == task_id:
-            t["status"] = status
-            if status == "done":
-                t["completed"] = datetime.now(timezone.utc).isoformat()
-                t["result"] = result
-            elif status == "blocked":
-                t["blocked_reason"] = error
-            elif status == "in_progress":
-                t["started"] = datetime.now(timezone.utc).isoformat()
-    save_dispatch(yaml_path, data)
+    with _yaml_lock:
+        data = load_dispatch(yaml_path)
+        for t in data["tasks"]:
+            if t["id"] == task_id:
+                t["status"] = status
+                if status == "done":
+                    t["completed"] = datetime.now(timezone.utc).isoformat()
+                    t["result"] = result
+                elif status == "blocked":
+                    t["blocked_reason"] = error
+                elif status == "in_progress":
+                    t["started"] = datetime.now(timezone.utc).isoformat()
+        save_dispatch(yaml_path, data)
 
 
 # ---------------------------------------------------------------------------
@@ -101,40 +106,38 @@ def get_status_summary(data: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Phase 3: Agent Launcher (handler per task type)
+# Phase 3: Agent Launcher — FIX #2: explicit task_yaml field
 # ---------------------------------------------------------------------------
 
 def run_art_iterate(task: dict) -> str:
     """Run autoresearch loop for an art asset task."""
-    task_input = task.get("input", "")
-
-    # Check if there's a matching task YAML in autoresearch/tasks/
-    task_id = task["id"]
-    candidates = list(COMFYUI_DIR.glob(f"autoresearch/tasks/{task_id}*.yaml"))
-    if not candidates:
-        candidates = list(COMFYUI_DIR.glob("autoresearch/tasks/*.yaml"))
-        # Try to match by keywords in task input
-        for c in candidates:
-            if any(kw in c.name for kw in task_id.split("_")):
-                candidates = [c]
-                break
-
-    if candidates:
-        task_yaml = candidates[0]
-        logger.info("Art iterate: using %s", task_yaml)
-        result = subprocess.run(
-            [sys.executable, "-m", "autoresearch.loop", str(task_yaml)],
-            cwd=str(COMFYUI_DIR), capture_output=True, text=True, timeout=3600)
-        # Check for final.png
-        lines = result.stdout.strip().split("\n")
-        for line in reversed(lines):
-            if "best_score=" in line:
-                return line.strip()
-        if result.returncode == 0:
-            return f"completed (exit 0), output: {lines[-1] if lines else 'none'}"
-        return f"failed (exit {result.returncode}): {result.stderr[-200:]}"
+    # FIX #2: use explicit task_yaml field if provided
+    explicit_yaml = task.get("task_yaml")
+    if explicit_yaml:
+        task_yaml = COMFYUI_DIR / explicit_yaml
     else:
-        return "no task YAML found — create one in autoresearch/tasks/"
+        task_id = task["id"]
+        candidates = list(COMFYUI_DIR.glob(f"autoresearch/tasks/{task_id}*.yaml"))
+        if candidates:
+            task_yaml = candidates[0]
+        else:
+            return f"ERROR: no task YAML found for '{task_id}'. Add task_yaml field to dispatch."
+
+    if not task_yaml.exists():
+        return f"ERROR: task YAML not found: {task_yaml}"
+
+    logger.info("Art iterate: using %s", task_yaml)
+    result = subprocess.run(
+        [sys.executable, "-m", "autoresearch.loop", str(task_yaml)],
+        cwd=str(COMFYUI_DIR), capture_output=True, text=True, timeout=3600)
+
+    lines = result.stdout.strip().split("\n")
+    for line in reversed(lines):
+        if "best_score=" in line:
+            return line.strip()
+    if result.returncode == 0:
+        return f"completed (exit 0), output: {lines[-1] if lines else 'none'}"
+    return f"failed (exit {result.returncode}): {result.stderr[-200:]}"
 
 
 def run_engineering_code(task: dict) -> str:
@@ -152,15 +155,16 @@ Task: {task_input}
 
 After making changes:
 1. Verify no compile errors
-2. Report what you changed
+2. Report what you changed concisely
 """
+    # FIX #3: flag order matters — --dangerously-skip-permissions before -p
     result = subprocess.run(
-        ["claude", "-p", prompt, "--output-format", "json",
-         "--dangerously-skip-permissions"],
+        ["claude", "--dangerously-skip-permissions", "-p", prompt,
+         "--output-format", "json"],
         capture_output=True, text=True, timeout=600,
         cwd=str(GOPOO_CLIENT))
     if result.returncode != 0:
-        return f"claude -p failed: {result.stderr[:300]}"
+        return f"claude failed (exit {result.returncode}): {result.stderr[:300]}"
     try:
         wrapper = json.loads(result.stdout)
         return wrapper.get("result", "")[:500]
@@ -168,40 +172,62 @@ After making changes:
         return result.stdout[:500]
 
 
+def _parse_panel_name(task_input: str) -> str:
+    """FIX #4: Extract panel name from task input."""
+    panels = ["MainMenuPanel", "GamePanel", "LobbyPanel", "ResultPanel"]
+    for p in panels:
+        if p.lower() in task_input.lower():
+            return p
+    # Try shorter names
+    for short, full in [("mainmenu", "MainMenuPanel"), ("main menu", "MainMenuPanel"),
+                        ("lobby", "LobbyPanel"), ("game", "GamePanel"),
+                        ("result", "ResultPanel")]:
+        if short in task_input.lower():
+            return full
+    return "GamePanel"
+
+
 def run_qa_review(task: dict) -> str:
     """Capture screenshot and evaluate against checklist."""
     task_input = task.get("input", "")
+    panel_name = _parse_panel_name(task_input)
 
-    # Capture screenshot
-    out_path = COMFYUI_DIR / "runs" / f"qa_review_{int(time.time())}.png"
-    capture_result = subprocess.run(
+    out_path = COMFYUI_DIR / "runs" / f"qa_{panel_name}_{int(time.time())}.png"
+
+    # Build panel first
+    subprocess.run(
+        ["npx", "--yes", "unity-mcp-cli", "run-tool", "gopoo-exec-menu",
+         "--input", json.dumps({"menuPath": f"GoPoo/Build Panels/{panel_name.replace('Panel','').strip()} Panel"})],
+        capture_output=True, text=True, timeout=30,
+        cwd=str(GOPOO_CLIENT))
+    time.sleep(3)
+
+    # Capture
+    subprocess.run(
         ["npx", "--yes", "unity-mcp-cli", "run-tool", "gopoo-capture-panel",
-         "--input", json.dumps({"panelName": "GamePanel",
+         "--input", json.dumps({"panelName": panel_name,
                                 "outPath": str(out_path), "extraWait": 5})],
         capture_output=True, text=True, timeout=60,
         cwd=str(GOPOO_CLIENT))
     time.sleep(18)
 
     if not out_path.exists():
-        return "capture failed — screenshot not generated"
+        return f"capture failed for {panel_name} — screenshot not generated"
 
-    # Evaluate with Claude vision
     checklist_path = STUDIO_DIR / "base/qa/wiki/pages/page-review-checklist.md"
-    checklist = checklist_path.read_text() if checklist_path.exists() else "standard review"
+    checklist = checklist_path.read_text()[:3000] if checklist_path.exists() else "standard review"
 
-    prompt = f"""You are a QA reviewer. Read the screenshot at {out_path}.
+    prompt = f"""Read the screenshot at {out_path}. This is the {panel_name}.
 
 Evaluate against this checklist:
 {checklist}
 
-SAFETY: This is a read-only review. Do NOT modify any files.
-
-Score each section 0-10. Return JSON:
-{{"sections": {{"rendering": N, "text": N, "touch": N, "layout": N, "hierarchy": N, "players": N, "content": N, "consistency": N}}, "overall": N, "issues": ["..."], "recommendations": ["..."]}}
+Score each section 0-10. Return ONLY this JSON:
+{{"panel": "{panel_name}", "sections": {{"rendering": N, "text": N, "touch": N, "layout": N, "hierarchy": N, "players": N, "content": N, "consistency": N}}, "overall": N, "issues": ["..."], "recommendations": ["..."]}}
 """
     result = subprocess.run(
-        ["claude", "-p", prompt, "--output-format", "json",
-         "--dangerously-skip-permissions"],
+        ["claude", "--dangerously-skip-permissions", "-p", prompt,
+         "--output-format", "json"],
         capture_output=True, text=True, timeout=300)
     try:
         wrapper = json.loads(result.stdout)
@@ -212,10 +238,9 @@ Score each section 0-10. Return JSON:
 
 def run_studio_report(task: dict) -> str:
     """Collect all task results and send Feishu summary."""
-    return "report"  # handled by dispatch_loop epilogue
+    return "report"
 
 
-# Handler registry
 HANDLERS: Dict[tuple, Callable] = {
     ("art", "iterate"): run_art_iterate,
     ("art", "generate"): run_art_iterate,
@@ -226,7 +251,6 @@ HANDLERS: Dict[tuple, Callable] = {
 
 
 def _gather_knowledge(dept: str) -> str:
-    """Load AGENTS.md + wiki index for a department."""
     parts = []
     for base in [STUDIO_DIR / "base" / dept,
                  Path(os.path.expanduser("~/Projects/gopoo-studio-project")) / dept]:
@@ -244,8 +268,6 @@ def _gather_knowledge(dept: str) -> str:
 # ---------------------------------------------------------------------------
 
 class ResourceManager:
-    """Simple lock-based resource manager."""
-
     def __init__(self):
         self._locks: Dict[str, threading.Lock] = {
             "comfyui": threading.Lock(),
@@ -271,179 +293,215 @@ class ResourceManager:
 
 
 # ---------------------------------------------------------------------------
-# Phase 5: Dispatch Runner Loop
+# Phase 5: Result Validation — FIX #5
 # ---------------------------------------------------------------------------
 
+def validate_result(task: dict, result: str) -> tuple[bool, str]:
+    """Check if result indicates real success, not a permission/error message."""
+    agent, action = task["agent"], task["action"]
+    result_lower = result.lower()
+
+    # Generic failure indicators
+    failure_phrases = [
+        "waiting for you to grant",
+        "permission",
+        "could you approve",
+        "could you grant",
+        "i need access",
+        "cannot proceed",
+        "error: response data is null",
+    ]
+    for phrase in failure_phrases:
+        if phrase in result_lower:
+            return False, f"result contains failure indicator: '{phrase}'"
+
+    # Per-type validation
+    if agent == "art" and action == "iterate":
+        if "score=" not in result and "completed" not in result_lower:
+            return False, "art result missing score or completion indicator"
+
+    if agent == "engineering" and action == "code":
+        if len(result) < 20:
+            return False, "engineering result too short — likely no changes made"
+
+    if agent == "qa" and action == "review":
+        if "sections" not in result and "rendering" not in result:
+            return False, "QA result missing sections/scores"
+
+    return True, "ok"
+
+
+# ---------------------------------------------------------------------------
+# Phase 6: Dispatch Loop — FIX #1: parallel execution
+# ---------------------------------------------------------------------------
+
+TASK_TIMEOUT = {
+    ("art", "iterate"): 1800,
+    ("engineering", "code"): 600,
+    ("qa", "review"): 300,
+    ("studio", "report"): 120,
+}
+
+
 def notify(agent: str, message: str):
-    """Send notification via Feishu."""
     try:
-        notify_module = COMFYUI_DIR / "autoresearch" / "feishu_notify.py"
-        if notify_module.exists():
-            sys.path.insert(0, str(COMFYUI_DIR))
-            from autoresearch.feishu_notify import send
-            send(agent, message)
-        else:
-            logger.info("[%s] %s", agent, message)
+        sys.path.insert(0, str(COMFYUI_DIR))
+        from autoresearch.feishu_notify import send
+        send(agent, message)
     except Exception as e:
         logger.warning("Feishu notify failed: %s", e)
 
 
-TASK_TIMEOUT = {
-    ("art", "iterate"): 1800,     # 30 min per art task
-    ("engineering", "code"): 600,  # 10 min per code task
-    ("qa", "review"): 300,         # 5 min per review
-    ("studio", "report"): 120,     # 2 min for report
-}
+def _run_task(task: dict, yaml_path: Path, resources: ResourceManager) -> tuple[str, str]:
+    """Execute a single task. Returns (task_id, result_or_error)."""
+    agent, action = task["agent"], task["action"]
+    task_id = task["id"]
+
+    handler = HANDLERS.get((agent, action))
+    if not handler:
+        return task_id, f"ERROR: no handler for {agent}.{action}"
+
+    # Acquire resource (blocking wait with timeout for parallel tasks)
+    resource_key = resources._resource_map.get((agent, action))
+    if resource_key:
+        lock = resources._locks[resource_key]
+        acquired = lock.acquire(timeout=TASK_TIMEOUT.get((agent, action), 600))
+        if not acquired:
+            return task_id, "ERROR: resource timeout"
+    else:
+        lock = None
+
+    try:
+        from core.safety import pre_execute_check, post_execute_check
+        ok, reason = pre_execute_check(agent, task)
+        if not ok:
+            return task_id, f"SAFETY_BLOCK: {reason}"
+
+        mark_status(yaml_path, task_id, "in_progress")
+        notify(agent, f"⚙️ 开始: {task_id}")
+        logger.info("Starting: %s (%s.%s)", task_id, agent, action)
+
+        timeout = TASK_TIMEOUT.get((agent, action), 600)
+        result = handler(task)
+
+        # FIX #5: validate result
+        valid, reason = validate_result(task, str(result))
+        if not valid:
+            notify(agent, f"⚠️ 结果无效: {task_id} — {reason}")
+            logger.warning("Invalid result for %s: %s", task_id, reason)
+            return task_id, f"INVALID: {reason} | raw: {str(result)[:200]}"
+
+        warnings = post_execute_check(agent, task, str(result))
+        for w in warnings:
+            notify(agent, f"⚠️ {w}")
+
+        return task_id, str(result)[:500]
+
+    except Exception as e:
+        return task_id, f"ERROR: {str(e)[:300]}"
+    finally:
+        if lock and lock.locked():
+            lock.release()
 
 
-def dispatch_loop(yaml_path: Path, poll_interval: int = 30, dry_run: bool = False):
-    """Main dispatch loop."""
+def dispatch_loop(yaml_path: Path, poll_interval: int = 15, dry_run: bool = False):
+    """Main dispatch loop with parallel execution."""
     yaml_path = Path(yaml_path).resolve()
     data = load_dispatch(yaml_path)
     goal = data.get("goal", "unknown")
     total = len(data["tasks"])
 
     logger.info("Dispatch: %s (%d tasks)", goal, total)
-    notify("Studio", f"🚀 Dispatch 开始: {goal}\n{get_status_summary(data)}")
+    notify("Studio", f"🚀 Dispatch 开始: {goal}\n任务数: {total}\n{get_status_summary(data)}")
 
     if dry_run:
         ready = get_ready_tasks(data)
         logger.info("Dry run — ready tasks: %s", [t["id"] for t in ready])
         for t in ready:
-            logger.info("  %s → %s.%s", t["id"], t["agent"], t["action"])
+            logger.info("  %s → %s.%s (resource: %s)", t["id"], t["agent"], t["action"],
+                       ResourceManager()._resource_map.get((t["agent"], t["action"]), "none"))
         return
 
     resources = ResourceManager()
-    max_iterations = total * 3  # safety limit
-    iteration = 0
+    max_rounds = total * 3
+    executor = ThreadPoolExecutor(max_workers=3)
 
-    while iteration < max_iterations:
-        iteration += 1
+    for round_n in range(max_rounds):
         data = load_dispatch(yaml_path)
 
         if all_done(data):
             logger.info("All tasks done!")
-            notify("Studio", f"✅ Dispatch 完成: {goal}\n{get_status_summary(data)}")
             break
 
         ready = get_ready_tasks(data)
-
         if not ready:
-            if any_blocked(data):
-                blocked = [t["id"] for t in data["tasks"] if t.get("status") == "blocked"]
-                logger.warning("Blocked tasks: %s", blocked)
-                notify("Studio", f"❌ Dispatch 阻塞: {blocked}\n需要人工介入")
-                break
-            # Nothing ready but not done — tasks still in_progress
             in_progress = [t["id"] for t in data["tasks"] if t.get("status") == "in_progress"]
             if in_progress:
-                logger.info("Waiting for: %s", in_progress)
+                logger.info("Round %d: waiting for %s", round_n, in_progress)
                 time.sleep(poll_interval)
                 continue
-            # Stuck — all planned but deps not met (shouldn't happen)
-            logger.error("Stuck — no ready tasks, no in_progress, not all done")
-            notify("Studio", f"⚠️ Dispatch 卡住了\n{get_status_summary(data)}")
+            if any_blocked(data):
+                blocked = [t["id"] for t in data["tasks"] if t.get("status") == "blocked"]
+                notify("Studio", f"❌ 阻塞: {blocked}")
+                break
+            notify("Studio", f"⚠️ 卡住了\n{get_status_summary(data)}")
             break
 
-        # Launch ready tasks
+        # FIX #1: Launch ready tasks in parallel via ThreadPoolExecutor
+        logger.info("Round %d: launching %d tasks: %s", round_n,
+                    len(ready), [t["id"] for t in ready])
+
+        futures = {}
         for task in ready:
-            agent, action = task["agent"], task["action"]
-            handler = HANDLERS.get((agent, action))
-            if not handler:
-                logger.warning("No handler for %s.%s — skipping %s", agent, action, task["id"])
-                mark_status(yaml_path, task["id"], "blocked", error=f"no handler for {agent}.{action}")
-                notify(agent, f"❌ {task['id']}: 没有执行器")
-                continue
+            future = executor.submit(_run_task, task, yaml_path, resources)
+            futures[future] = task
 
-            if not resources.acquire(agent, action):
-                logger.info("Resource busy for %s.%s — will retry", agent, action)
-                continue
-
-            # Safety pre-check
-            from core.safety import pre_execute_check, post_execute_check
-            ok, reason = pre_execute_check(agent, task)
-            if not ok:
-                mark_status(yaml_path, task["id"], "blocked", error=f"SAFETY: {reason}")
-                notify(agent, f"🛑 安全拦截: {task['id']}\n{reason}")
-                logger.warning("Safety blocked: %s → %s", task["id"], reason)
-                resources.release(agent, action)
-                continue
-
-            mark_status(yaml_path, task["id"], "in_progress")
-            notify(agent, f"⚙️ 开始: {task['id']}")
-            logger.info("Starting: %s (%s.%s)", task["id"], agent, action)
-
+        for future in as_completed(futures):
+            task = futures[future]
+            task_id = task["id"]
             try:
-                timeout = TASK_TIMEOUT.get((agent, action), 600)
-                import signal
+                tid, result = future.result(timeout=1900)
 
-                class TaskTimeout(Exception):
-                    pass
-
-                def _timeout_handler(signum, frame):
-                    raise TaskTimeout(f"timeout after {timeout}s")
-
-                old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-                signal.alarm(timeout)
-                try:
-                    result = handler(task)
-                finally:
-                    signal.alarm(0)
-                    signal.signal(signal.SIGALRM, old_handler)
-
-                # Safety post-check
-                warnings = post_execute_check(agent, task, str(result))
-                if warnings:
-                    for w in warnings:
-                        notify(agent, f"⚠️ 安全警告: {w}")
-                        logger.warning("Safety warning for %s: %s", task["id"], w)
-
-                mark_status(yaml_path, task["id"], "done", result=str(result)[:500])
-                notify(agent, f"✅ 完成: {task['id']}\n{str(result)[:200]}")
-                logger.info("Done: %s → %s", task["id"], str(result)[:100])
-            except TaskTimeout as e:
-                mark_status(yaml_path, task["id"], "done",
-                            result=f"TIMEOUT: skipped after {timeout}s")
-                notify(agent, f"⏰ 超时跳过: {task['id']} ({timeout}s)")
-                logger.warning("Timeout: %s after %ds — skipping", task["id"], timeout)
+                if result.startswith("ERROR:") or result.startswith("SAFETY_BLOCK:"):
+                    mark_status(yaml_path, tid, "blocked", error=result)
+                    notify(task["agent"], f"❌ {tid}: {result[:150]}")
+                    logger.error("Blocked: %s → %s", tid, result[:100])
+                elif result.startswith("INVALID:"):
+                    mark_status(yaml_path, tid, "blocked", error=result)
+                    notify(task["agent"], f"⚠️ {tid} 结果无效，标记阻塞:\n{result[:150]}")
+                    logger.warning("Invalid: %s → %s", tid, result[:100])
+                else:
+                    mark_status(yaml_path, tid, "done", result=result)
+                    notify(task["agent"], f"✅ {tid}\n{result[:150]}")
+                    logger.info("Done: %s → %s", tid, result[:80])
             except Exception as e:
-                mark_status(yaml_path, task["id"], "done",
-                            result=f"ERROR: {str(e)[:200]} — skipped")
-                notify(agent, f"❌ 失败跳过: {task['id']}\n{str(e)[:150]}")
-                logger.error("Failed: %s → %s — marking done to continue", task["id"], e)
-            finally:
-                resources.release(agent, action)
+                mark_status(yaml_path, task_id, "blocked", error=str(e)[:300])
+                notify(task["agent"], f"❌ {task_id}: {str(e)[:150]}")
 
     # Final summary
+    executor.shutdown(wait=False)
     data = load_dispatch(yaml_path)
-    summary_lines = []
+    lines = []
     for t in data["tasks"]:
-        status = t.get("status", "planned")
-        icon = {"done": "✅", "blocked": "❌", "in_progress": "⏳"}.get(status, "⬜")
-        result = t.get("result", t.get("blocked_reason", ""))[:80]
-        summary_lines.append(f"{icon} {t['id']} ({t['agent']}) — {result or status}")
+        s = t.get("status", "planned")
+        icon = {"done": "✅", "blocked": "❌", "in_progress": "⏳"}.get(s, "⬜")
+        r = t.get("result", t.get("blocked_reason", ""))
+        lines.append(f"{icon} {t['id']} ({t['agent']}) — {str(r)[:60] if r else s}")
 
-    summary = "\n".join(summary_lines)
-    notify("Studio", f"📋 Dispatch 报告: {goal}\n\n{summary}")
+    summary = "\n".join(lines)
+    notify("Studio", f"📋 Dispatch 完了: {goal}\n\n{summary}")
     logger.info("Dispatch finished:\n%s", summary)
 
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 
 def main():
     import argparse
     p = argparse.ArgumentParser(description="Run a task dispatch YAML")
-    p.add_argument("yaml_file", type=Path, help="Path to dispatch YAML")
-    p.add_argument("--dry", action="store_true", help="Show plan without executing")
-    p.add_argument("--poll", type=int, default=30, help="Poll interval in seconds")
+    p.add_argument("yaml_file", type=Path)
+    p.add_argument("--dry", action="store_true")
+    p.add_argument("--poll", type=int, default=15)
     args = p.parse_args()
-
     if not args.yaml_file.exists():
-        print(f"File not found: {args.yaml_file}", file=sys.stderr)
-        sys.exit(1)
-
+        sys.exit(f"File not found: {args.yaml_file}")
     dispatch_loop(args.yaml_file, poll_interval=args.poll, dry_run=args.dry)
 
 
