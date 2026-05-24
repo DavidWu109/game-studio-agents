@@ -15,3 +15,6 @@ build/
 # Runtime
 runs/
 *.log
+
+# Projects are separate repos, not part of the framework
+projects/*/
