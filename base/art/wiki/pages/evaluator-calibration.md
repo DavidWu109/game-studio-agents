@@ -59,4 +59,77 @@ If Pass 2 holistic score ≥ 7 but Pass 1 has failed items:
 - **Composition/mood**: "does this feel right" > "is each element exactly as described"
 - **Artistic judgment**: the human's "this feels nervous" overrides 0/3 on expression items
 
+## Multi-Dimension Scoring (Composite Assets)
+
+Discovered during card_back_v2 review (2026-05-24):
+
+- R1S1 scored 4/10 overall, but had the **best border, composition, and card feel**
+- R3S1 scored 8/10 overall, but had the **best mascot character** while other
+  elements were flat/plain
+- Human verdict: ideal result = R1S1's border + R3S1's poop mascot
+
+### The Problem
+
+Single-score evaluation forces a false choice. A complex asset (card, panel,
+scene) has **independent visual dimensions** that should be scored separately:
+
+| Dimension | R1S1 | R3S1 |
+|---|---|---|
+| Border/frame quality | 9 | 5 |
+| Central character | 4 | 9 |
+| Color/palette | 8 | 7 |
+| Suit symbols | 7 | 6 |
+| Overall card feel | 8 | 6 |
+| **Single score (evaluator)** | **4** | **8** |
+
+R3S1 "won" because the evaluator's single score was dragged up by the character.
+R1S1 "lost" because the evaluator's single score was dragged down by the character.
+Neither score reflects the dimensional strengths.
+
+### Fix: Dimensional Scoring for Composite Assets
+
+For assets with multiple independent visual regions (cards, panels, frames),
+score each dimension separately:
+
+```json
+{
+  "dimensions": {
+    "border_frame": {"score": 8, "notes": "ornate gold, good weight"},
+    "central_element": {"score": 4, "notes": "too simple, needs CotL style"},
+    "color_palette": {"score": 9, "notes": "deep purple on target"},
+    "decorative_details": {"score": 7, "notes": "suit symbols present"},
+    "overall_feel": {"score": 8, "notes": "reads as premium card back"}
+  },
+  "composite_score": 7.2,
+  "best_dimensions": ["border_frame", "color_palette"],
+  "worst_dimensions": ["central_element"]
+}
+```
+
+### Enabling Composite Workflows
+
+Dimensional scoring enables a new production strategy:
+
+```
+Round N produces images with per-dimension scores
+  → Identify "best border" image and "best character" image
+  → Inpaint: use best border as base, replace central region
+     with best character's style
+  → Evaluate the composite
+```
+
+This is more efficient than hoping one prompt produces all dimensions
+perfectly in a single generation. Especially for Flux, which tends to
+excel at one aspect per seed while trading off others.
+
+### When to Use Dimensional vs Single Score
+
+| Asset Type | Scoring | Why |
+|---|---|---|
+| Character sprite | Single + holistic | One visual subject, expression matters as whole |
+| Button | Single | Simple shape, uniform quality |
+| Card back/front | Dimensional | Multiple independent regions (border, center, corners) |
+| Panel/frame | Dimensional | Frame + content area + decorations |
+| Background/scene | Dimensional | Composition + mood + detail elements |
+
 See also: [[flux-priors]] (expression nuance ceiling)
