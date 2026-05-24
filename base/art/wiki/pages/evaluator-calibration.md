@@ -132,4 +132,4 @@ excel at one aspect per seed while trading off others.
 | Panel/frame | Dimensional | Frame + content area + decorations |
 | Background/scene | Dimensional | Composition + mood + detail elements |
 
-See also: [[flux-priors]] (expression nuance ceiling)
+See also: [[flux-priors]] (expression nuance ceiling), [[page-review-checklist]]

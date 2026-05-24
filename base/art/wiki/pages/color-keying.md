@@ -43,4 +43,4 @@ The spread check (max-min ≤ 25) is the key insight:
 All assets standardize to power-of-two canvas (e.g. 256×128) for optimal
 Unity sprite atlas packing.
 
-See also: [[controlnet-guide]]
+See also: [[controlnet-guide]], [[flux-priors]]

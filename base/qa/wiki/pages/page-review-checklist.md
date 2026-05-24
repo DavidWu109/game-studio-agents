@@ -25,7 +25,7 @@ Every visible element must actually render, not just occupy space.
 
 **Common failure**: editor preview doesn't trigger runtime initialization —
 sprites loaded via `Sprite.Create()` at build time lose references when
-saved to prefab. Use persistent asset paths.
+saved to prefab. Use persistent asset paths. See [[sprite-path-gotcha]].
 
 ## 2. Text Readability
 
@@ -97,7 +97,7 @@ All elements should feel like they belong to the same game.
 
 ## Scoring
 
-Use the dual-layer scoring system from [[ui-scoring-system]]:
+Use the dual-layer scoring system from [[evaluator-calibration]]:
 - Component scores per section above (any < 6 blocks shipping)
 - Weighted overall ≥ 7.5 to approve
 

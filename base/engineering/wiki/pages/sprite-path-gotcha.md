@@ -45,4 +45,4 @@ This bug consumed 3 rounds of GamePanel iteration (R1-R3) debugging
 why dummy hand cards rendered as white rectangles instead of showing
 card frames.
 
-See also: [[unity-gotchas]]
+See also: [[unity-gotchas]], [[screenshot-capture]]

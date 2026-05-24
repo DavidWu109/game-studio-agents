@@ -41,3 +41,5 @@ is true for any game. It goes in `base/`, not `projects/`.
 **Base or project?**
 > "Would this still be true for a completely different game?"
 > YES → base. NO → project.
+
+See also: [[roadmap]], [[evaluator-calibration]]

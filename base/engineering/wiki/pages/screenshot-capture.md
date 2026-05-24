@@ -39,4 +39,4 @@ automated evaluation.
 `screencapture` CLI requires display access. Fails in sandboxed environments
 with "could not create image from display".
 
-See also: [[unity-gotchas]]
+See also: [[unity-gotchas]], [[sprite-path-gotcha]]

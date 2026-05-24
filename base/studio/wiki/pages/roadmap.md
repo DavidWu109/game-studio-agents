@@ -24,6 +24,8 @@ is the target state — goal is to fill it with real content over the next month
 3. **Hermes/Feishu bridge is low priority** — "good enough" for occasional use
 4. **core/agent.py stays skeleton** — implement when there's a real automation need
 
+See also: [[knowledge-routing]], [[page-review-checklist]]
+
 ## What Makes This System Valuable
 
 Not the Python code. Not the framework classes. The **markdown files themselves**.
