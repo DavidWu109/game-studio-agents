@@ -139,10 +139,14 @@ def run_art_iterate(task: dict) -> str:
 
 def run_engineering_code(task: dict) -> str:
     """Delegate code changes to Claude Code CLI."""
+    from core.safety import build_safety_prompt
     task_input = task.get("input", "")
     knowledge = _gather_knowledge("engineering")
+    safety = build_safety_prompt("engineering")
 
     prompt = f"""{knowledge}
+
+{safety}
 
 Task: {task_input}
 
@@ -151,7 +155,8 @@ After making changes:
 2. Report what you changed
 """
     result = subprocess.run(
-        ["claude", "-p", prompt, "--output-format", "json"],
+        ["claude", "-p", prompt, "--output-format", "json",
+         "--dangerously-skip-permissions"],
         capture_output=True, text=True, timeout=600,
         cwd=str(GOPOO_CLIENT))
     if result.returncode != 0:
@@ -189,11 +194,14 @@ def run_qa_review(task: dict) -> str:
 Evaluate against this checklist:
 {checklist}
 
+SAFETY: This is a read-only review. Do NOT modify any files.
+
 Score each section 0-10. Return JSON:
 {{"sections": {{"rendering": N, "text": N, "touch": N, "layout": N, "hierarchy": N, "players": N, "content": N, "consistency": N}}, "overall": N, "issues": ["..."], "recommendations": ["..."]}}
 """
     result = subprocess.run(
-        ["claude", "-p", prompt, "--output-format", "json"],
+        ["claude", "-p", prompt, "--output-format", "json",
+         "--dangerously-skip-permissions"],
         capture_output=True, text=True, timeout=300)
     try:
         wrapper = json.loads(result.stdout)
@@ -343,12 +351,30 @@ def dispatch_loop(yaml_path: Path, poll_interval: int = 30, dry_run: bool = Fals
                 logger.info("Resource busy for %s.%s — will retry", agent, action)
                 continue
 
+            # Safety pre-check
+            from core.safety import pre_execute_check, post_execute_check
+            ok, reason = pre_execute_check(agent, task)
+            if not ok:
+                mark_status(yaml_path, task["id"], "blocked", error=f"SAFETY: {reason}")
+                notify(agent, f"🛑 安全拦截: {task['id']}\n{reason}")
+                logger.warning("Safety blocked: %s → %s", task["id"], reason)
+                resources.release(agent, action)
+                continue
+
             mark_status(yaml_path, task["id"], "in_progress")
             notify(agent, f"⚙️ 开始: {task['id']}")
             logger.info("Starting: %s (%s.%s)", task["id"], agent, action)
 
             try:
                 result = handler(task)
+
+                # Safety post-check
+                warnings = post_execute_check(agent, task, str(result))
+                if warnings:
+                    for w in warnings:
+                        notify(agent, f"⚠️ 安全警告: {w}")
+                        logger.warning("Safety warning for %s: %s", task["id"], w)
+
                 mark_status(yaml_path, task["id"], "done", result=str(result)[:500])
                 notify(agent, f"✅ 完成: {task['id']}\n{str(result)[:200]}")
                 logger.info("Done: %s → %s", task["id"], str(result)[:100])

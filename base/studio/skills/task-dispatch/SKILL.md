@@ -147,9 +147,26 @@ When a task fails:
     escalate_to: human
 ```
 
+## Safety Rules for Automated Execution
+
+Agent handlers use `claude -p --dangerously-skip-permissions` for
+unattended execution. Safety is enforced via prompt constraints:
+
+| Agent | Allowed | Forbidden |
+|---|---|---|
+| Engineering | Modify Assets/Editor/, Assets/Scripts/ | Delete .cs files, modify outside project |
+| QA | Read screenshots, read wiki | Modify any files |
+| Art | Run autoresearch loop, write to runs/ | Modify source code |
+| Studio | Read status, send notifications | Modify task files during execution |
+
+These rules are embedded in the handler prompts in `core/dispatch.py`.
+They are NOT enforced by the system — a misbehaving LLM could violate them.
+For critical deployments, add file system sandboxing.
+
 ## Pitfalls
 
 - Don't start dependent tasks before dependencies are done (obvious but easy to forget)
 - Don't skip QA review to save time — it catches issues that compound
 - Report results even on failure — the failure itself is information
 - Write to wiki DURING dispatch, not just at the end — partial progress has value
+- `claude -p` permission errors will silently "succeed" with no actual changes — check results
