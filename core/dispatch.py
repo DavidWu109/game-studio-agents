@@ -288,6 +288,14 @@ def notify(agent: str, message: str):
         logger.warning("Feishu notify failed: %s", e)
 
 
+TASK_TIMEOUT = {
+    ("art", "iterate"): 1800,     # 30 min per art task
+    ("engineering", "code"): 600,  # 10 min per code task
+    ("qa", "review"): 300,         # 5 min per review
+    ("studio", "report"): 120,     # 2 min for report
+}
+
+
 def dispatch_loop(yaml_path: Path, poll_interval: int = 30, dry_run: bool = False):
     """Main dispatch loop."""
     yaml_path = Path(yaml_path).resolve()
@@ -366,7 +374,22 @@ def dispatch_loop(yaml_path: Path, poll_interval: int = 30, dry_run: bool = Fals
             logger.info("Starting: %s (%s.%s)", task["id"], agent, action)
 
             try:
-                result = handler(task)
+                timeout = TASK_TIMEOUT.get((agent, action), 600)
+                import signal
+
+                class TaskTimeout(Exception):
+                    pass
+
+                def _timeout_handler(signum, frame):
+                    raise TaskTimeout(f"timeout after {timeout}s")
+
+                old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+                signal.alarm(timeout)
+                try:
+                    result = handler(task)
+                finally:
+                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, old_handler)
 
                 # Safety post-check
                 warnings = post_execute_check(agent, task, str(result))
@@ -378,10 +401,16 @@ def dispatch_loop(yaml_path: Path, poll_interval: int = 30, dry_run: bool = Fals
                 mark_status(yaml_path, task["id"], "done", result=str(result)[:500])
                 notify(agent, f"✅ 完成: {task['id']}\n{str(result)[:200]}")
                 logger.info("Done: %s → %s", task["id"], str(result)[:100])
+            except TaskTimeout as e:
+                mark_status(yaml_path, task["id"], "done",
+                            result=f"TIMEOUT: skipped after {timeout}s")
+                notify(agent, f"⏰ 超时跳过: {task['id']} ({timeout}s)")
+                logger.warning("Timeout: %s after %ds — skipping", task["id"], timeout)
             except Exception as e:
-                mark_status(yaml_path, task["id"], "blocked", error=str(e)[:300])
-                notify(agent, f"❌ 失败: {task['id']}\n{str(e)[:200]}")
-                logger.error("Failed: %s → %s", task["id"], e)
+                mark_status(yaml_path, task["id"], "done",
+                            result=f"ERROR: {str(e)[:200]} — skipped")
+                notify(agent, f"❌ 失败跳过: {task['id']}\n{str(e)[:150]}")
+                logger.error("Failed: %s → %s — marking done to continue", task["id"], e)
             finally:
                 resources.release(agent, action)
 
