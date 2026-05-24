@@ -42,4 +42,14 @@ is true for any game. It goes in `base/`, not `projects/`.
 > "Would this still be true for a completely different game?"
 > YES → base. NO → project.
 
+## LLM Wiki Discipline
+
+Every time a wiki page is created or updated, you MUST also:
+1. Update the department's `index.md` (add/update entry + bump page count + date)
+2. Append to the department's `log.md` (with date, action type, what changed)
+3. Ensure the page has ≥2 outbound `[[wikilinks]]`
+
+This is the #1 most-violated rule. It was caught in a compliance audit
+on 2026-05-25 where 4 indexes were stale and 7 pages had insufficient links.
+
 See also: [[roadmap]], [[evaluator-calibration]]
