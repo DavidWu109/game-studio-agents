@@ -12,3 +12,8 @@
 - Added month roadmap: 4-week plan from manual → automated team
 - Added progress bar, weekly milestones, agent host mapping
 - Updated priority from "fill knowledge" to "build autonomous agents"
+
+## [2026-05-25] create | task-dispatch skill
+- First dispatch skill: decompose goals → agent tasks → dependency graph
+- Task YAML format, parallel/sequential rules, status tracking
+- First real task file: gopoo/studio/tasks/gamepanel-fixes.yaml (6 tasks, 3 parallel)
