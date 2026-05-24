@@ -58,6 +58,33 @@ areas (128×128 category buttons). Common failures:
 3. Generate larger (256×256+) then downscale
 4. Simpler icon shapes (silhouettes > detailed drawings)
 
+## Expression Nuance Ceiling
+
+Flux has a strong prior mapping for negative emotions. "Nervous/tense/worried"
+consistently renders as "angry/grumpy" regardless of how precisely the physical
+features are described. Tested across 9+ rounds with increasingly specific
+physical descriptors (sideways pupils, upward brows, wavy mouth) — output
+always gravitates back to angry V-brows and frown.
+
+**This is an architectural ceiling, not a prompt problem.**
+
+Emotion words Flux handles well:
+- happy, excited, joyful → distinct, reliable
+- angry, furious → distinct, reliable
+- smug, confident → works with physical descriptors
+- sad, crying → distinct, reliable
+
+Emotion words Flux conflates:
+- nervous / tense / worried → renders as angry or sad
+- embarrassed / shy → renders as sad
+- confused / puzzled → renders as angry or neutral
+
+**Workaround options:**
+1. img2img from a working base expression (e.g. modify "angry" toward "worried")
+2. ControlNet with hand-drawn expression mask (draw the exact face you want)
+3. Generate "sad" and post-process (adjust brow angle in editing software)
+4. Accept the nearest achievable expression and compensate with game context
+
 ## Color Accuracy
 
 Flux frequently shifts colors lighter/more pastel than requested:
