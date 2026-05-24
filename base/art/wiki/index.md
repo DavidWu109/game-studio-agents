@@ -1,7 +1,7 @@
 # Art Wiki Index (Base)
 
 > Universal art generation knowledge. Applies to any game project.
-> Last updated: 2026-05-24 | Total pages: 4 | Skills: 2
+> Last updated: 2026-05-24 | Total pages: 4 | Skills: 3
 
 ## Concepts
 
@@ -14,3 +14,4 @@
 
 - `autoresearch-loop/` — Automated generate-evaluate-revise loop for art assets
 - `asset-postprocess/` — Standardize generated images for game engine deployment
+- `asset-review/` — Review generated finals, score, classify, route findings to wiki
