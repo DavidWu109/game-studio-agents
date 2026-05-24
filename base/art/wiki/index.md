@@ -1,7 +1,7 @@
 # Art Wiki Index (Base)
 
 > Universal art generation knowledge. Applies to any game project.
-> Last updated: 2026-05-24 | Total pages: 4
+> Last updated: 2026-05-24 | Total pages: 4 | Skills: 2
 
 ## Concepts
 
@@ -9,3 +9,8 @@
 - [[controlnet-guide]] — ControlNet mask design, Union Pro 2.0 setup, sweet spot parameters
 - [[lora-behavior]] — LoRA as style attractor, known LoRA behaviors, decision flow
 - [[color-keying]] — HSV color-key vs rembg, standard post-processing pipeline
+
+## Skills
+
+- `autoresearch-loop/` — Automated generate-evaluate-revise loop for art assets
+- `asset-postprocess/` — Standardize generated images for game engine deployment
