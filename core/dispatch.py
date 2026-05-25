@@ -187,6 +187,20 @@ def _parse_panel_name(task_input: str) -> str:
 
 def run_qa_review(task: dict) -> str:
     """Capture screenshot and evaluate against checklist."""
+    # Pre-check: Unity MCP reachable?
+    try:
+        check = subprocess.run(
+            ["npx", "--yes", "unity-mcp-cli", "run-tool", "gopoo-exec-menu",
+             "--input", json.dumps({"menuPath": "Help/About Unity"})],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(GOPOO_CLIENT))
+        if "Connection refused" in check.stderr or check.returncode != 0:
+            notify("qa", "⚠️ Unity Editor 未运行，请先启动 Unity")
+            return "ERROR: Unity MCP not reachable — start Unity Editor first"
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        notify("qa", "⚠️ Unity MCP 连接超时，请检查 Unity Editor")
+        return "ERROR: Unity MCP connection failed"
+
     task_input = task.get("input", "")
     panel_name = _parse_panel_name(task_input)
 
