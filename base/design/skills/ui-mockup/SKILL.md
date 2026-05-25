@@ -154,3 +154,5 @@ font = ImageFont.truetype(CLIENT / "Assets/Art/Fonts/LuckiestGuy.ttf", 32)
 - Don't forget hand card overlap — scattered cards don't feel "held"
 - Don't just mockup the happy path — error/waiting/overlay states matter
 - Mockup at 1920×1080 (game resolution), not arbitrary size
+- Text outline width must be ≥6px at 1920 width — 3px is invisible at this resolution
+- Always view mockup at ORIGINAL SIZE before delivering, not just thumbnail
