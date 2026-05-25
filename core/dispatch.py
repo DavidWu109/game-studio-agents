@@ -186,123 +186,50 @@ def _parse_panel_name(task_input: str) -> str:
 
 
 def run_qa_review(task: dict) -> str:
-    """Capture screenshot and evaluate against checklist."""
-    # Pre-check: Unity MCP reachable?
-    try:
-        check = subprocess.run(
-            ["npx", "--yes", "unity-mcp-cli", "run-tool", "gopoo-exec-menu",
-             "--input", json.dumps({"menuPath": "Help/About Unity"})],
-            capture_output=True, text=True, timeout=10,
-            cwd=str(GOPOO_CLIENT))
-        if "Connection refused" in check.stderr or check.returncode != 0:
-            notify("qa", "⚠️ Unity Editor 未运行，请先启动 Unity")
-            return "ERROR: Unity MCP not reachable — start Unity Editor first"
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        notify("qa", "⚠️ Unity MCP 连接超时，请检查 Unity Editor")
-        return "ERROR: Unity MCP connection failed"
+    """Capture screenshot and evaluate via screenshot_qa skill."""
+    from core.skills import registry
 
     task_input = task.get("input", "")
     panel_name = _parse_panel_name(task_input)
 
-    out_path = COMFYUI_DIR / "runs" / f"qa_{panel_name}_{int(time.time())}.png"
-
-    # Build panel first
-    subprocess.run(
-        ["npx", "--yes", "unity-mcp-cli", "run-tool", "gopoo-exec-menu",
-         "--input", json.dumps({"menuPath": f"GoPoo/Build Panels/{panel_name.replace('Panel','').strip()} Panel"})],
-        capture_output=True, text=True, timeout=30,
-        cwd=str(GOPOO_CLIENT))
-    time.sleep(3)
-
-    # Capture
-    subprocess.run(
-        ["npx", "--yes", "unity-mcp-cli", "run-tool", "gopoo-capture-panel",
-         "--input", json.dumps({"panelName": panel_name,
-                                "outPath": str(out_path), "extraWait": 5})],
-        capture_output=True, text=True, timeout=60,
-        cwd=str(GOPOO_CLIENT))
-    time.sleep(18)
-
-    if not out_path.exists():
-        return f"capture failed for {panel_name} — screenshot not generated"
-
-    checklist_path = STUDIO_DIR / "base/qa/wiki/pages/page-review-checklist.md"
-    checklist = checklist_path.read_text()[:3000] if checklist_path.exists() else "standard review"
-
-    prompt = f"""Read the screenshot at {out_path}. This is the {panel_name}.
-
-Evaluate against this checklist:
-{checklist}
-
-Score each section 0-10. Return ONLY this JSON:
-{{"panel": "{panel_name}", "sections": {{"rendering": N, "text": N, "touch": N, "layout": N, "hierarchy": N, "players": N, "content": N, "consistency": N}}, "overall": N, "issues": ["..."], "recommendations": ["..."]}}
-"""
-    # QA always routes to CLI (hallucination risk too high for DeepSeek)
-    from core.provider import run_prompt
-    qa_task = dict(task, provider="cli")
-    result = run_prompt(prompt, qa_task)
+    result = registry.run("screenshot_qa.capture_and_score",
+                          {"panel_name": panel_name})
+    if not result.success:
+        return f"ERROR: {result.text}"
     return result.text[:800]
 
 
 def run_studio_report(task: dict) -> str:
-    """Collect all results, build screenshot grid, send Feishu report with images."""
-    from PIL import Image, ImageDraw
+    """Collect screenshots and send report via feishu_report skill."""
+    from core.skills import registry
 
-    # Collect screenshots (QA captures + art finals)
-    screenshots = {}
     runs_dir = COMFYUI_DIR / "runs"
+    screenshots = {}
 
-    # Find QA screenshots (newest per panel name)
     for f in sorted(runs_dir.glob("qa_*.png"), key=lambda p: p.stat().st_mtime):
         for panel in ["GamePanel", "MainMenuPanel", "LobbyPanel", "ResultPanel"]:
             if panel.lower() in f.name.lower():
-                screenshots[panel] = f
+                screenshots[panel] = str(f)
 
-    # Find art finals from recent runs
     for run_dir in sorted(runs_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
         if not run_dir.is_dir():
             continue
         for final in run_dir.rglob("final.png"):
             name = run_dir.name
             if name not in screenshots:
-                screenshots[name] = final
+                screenshots[name] = str(final)
             if len(screenshots) >= 8:
                 break
 
     if not screenshots:
         return "report: no screenshots found"
 
-    # Build grid
-    items = list(screenshots.items())[:8]
-    cols = min(len(items), 2)
-    rows = (len(items) + cols - 1) // cols
-    thumb_w, thumb_h = 640, 360
-    grid = Image.new("RGB", (cols * thumb_w, rows * thumb_h + 40), (30, 30, 30))
-    draw = ImageDraw.Draw(grid)
-    draw.text((10, 8), f"Dispatch Report — {len(items)} screenshots", fill="white")
-
-    for i, (name, path) in enumerate(items):
-        try:
-            img = Image.open(path).resize((thumb_w, thumb_h), Image.LANCZOS)
-        except Exception:
-            img = Image.new("RGB", (thumb_w, thumb_h), (60, 60, 60))
-        x = (i % cols) * thumb_w
-        y = (i // cols) * thumb_h + 40
-        grid.paste(img, (x, y))
-        draw.text((x + 5, y + 3), name, fill="yellow")
-
-    grid_path = runs_dir / f"dispatch_report_{int(time.time())}.png"
-    grid.save(grid_path)
-
-    # Send via Feishu
-    try:
-        sys.path.insert(0, str(COMFYUI_DIR))
-        from autoresearch.feishu_notify import send_image
-        send_image("Studio", f"📋 Dispatch 截图报告 ({len(items)} panels)", str(grid_path))
-    except Exception as e:
-        logger.warning("Report image send failed: %s", e)
-
-    return f"report sent with {len(items)} screenshots: {[n for n,_ in items]}"
+    result = registry.run("feishu_report.send_grid", {
+        "channel": "Studio",
+        "title": f"Dispatch Report — {len(screenshots)} screenshots",
+        "screenshots": screenshots,
+    })
+    return result.text
 
 
 def run_design_code(task: dict) -> str:
