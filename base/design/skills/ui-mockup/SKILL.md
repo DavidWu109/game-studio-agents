@@ -84,24 +84,48 @@ Before delivering mockup, check EVERY item:
 - [ ] Background texture visible (not too dark, not too busy)
 - [ ] Table surface feels like a real table (not a flat color)
 - [ ] Hand cards feel "held" (fan shape, overlapping slightly, not scattered)
-- [ ] Safe area margins on all edges (notch/rounded corners)
+- [ ] Safe area margins on ALL FOUR edges (notch/rounded corners)
 - [ ] No large empty areas with no purpose
+- [ ] Core action buttons in thumb-reachable zone (bottom half of screen)
 
 **Scale:**
+- [ ] Avatars have avatar_frame (not bare emotion sprites floating)
 - [ ] Avatars large enough to show emotion (≥100px at 1920 width)
 - [ ] Card text readable (name, score visible at phone size)
 - [ ] Buttons meet 48pt minimum touch target
 - [ ] Toilet/card pile is the visual anchor of the table
 
+**Asset Quality:**
+- [ ] All sprites are alpha-transparent (no colored background boxes)
+- [ ] Avatar = circle mask + avatar sprite + avatar_frame overlay
+- [ ] Sprites not clipped or stretched
+
+**Game Logic Consistency:**
+- [ ] UI elements match game state (don't show face-up cards when they should be face-down)
+- [ ] Text labels are accurate for each state (no "YOUR TURN" during opponent's turn)
+- [ ] Interactive elements only active when state allows (dim/hide when not applicable)
+
+**Player Count Coverage:**
+- [ ] 2-player layout mockup (top + bottom)
+- [ ] 3-player layout mockup (top + left + bottom)
+- [ ] 4-player layout mockup (top + left + bottom + right)
+
+**Component Completeness:**
+- [ ] Every UI zone has a clear design intent (not just a colored rectangle)
+- [ ] Poo zone: how to display collected poos? counter? icon list?
+- [ ] All overlays properly dim background and center content
+
 **Consistency:**
 - [ ] All text uses game font with outlines
 - [ ] Colors match style-anchor palette
 - [ ] Element style consistent (all CotL cartoon, no mixed styles)
+- [ ] Text centered within containers (use textbbox, never hardcode offsets)
 
 **States:**
 - [ ] Each state has its own mockup
 - [ ] Transitions between states are clear (what appears/disappears)
 - [ ] Overlay states dim the background properly
+- [ ] State-specific text doesn't leak into other states
 
 ### Step 4: Build with PIL
 
