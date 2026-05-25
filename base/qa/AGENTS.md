@@ -78,6 +78,7 @@ Synthesis:  New failure patterns → wiki, refined checklists → skills
 ### Receives
 - `build_ready` from Engineering: new build to test
 - `asset_delivery` from Art: new visual assets to review
+- `mockup_ready` from Design: design target for comparison scoring
 
 ### Sends
 - `bug_report` to Engineering: defect found

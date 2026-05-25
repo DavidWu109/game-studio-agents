@@ -95,6 +95,20 @@ All elements should feel like they belong to the same game.
 - [ ] Background and foreground elements are from same art generation batch
 - [ ] No placeholder/programmer-art visible in review build
 
+## Mockup Comparison (when available)
+
+When Design agent has provided a mockup for the panel being reviewed,
+the primary scoring method is **visual diff against mockup**:
+
+1. Place mockup (design target) alongside Unity screenshot
+2. Score each section by how closely the implementation matches the design
+3. Specific deviations become actionable issues for Engineering
+
+Mockup source: `projects/<game>/design/mockups/<panel>.png`
+Provider: Design agent (PIL composite of real assets + game font)
+
+When no mockup exists, fall back to checklist-only scoring below.
+
 ## Scoring
 
 Use the dual-layer scoring system from [[evaluator-calibration]]:

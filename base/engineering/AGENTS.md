@@ -90,6 +90,7 @@ Key: always check DLL timestamp after Assets/Refresh to confirm recompilation.
 
 ### Receives
 - `asset_delivery` from Art: new asset at Unity path, ready to integrate
+- `mockup_ready` from Design: design target — build panel to match this layout
 - `bug_report` from QA: something broken, needs fixing
 - `priority_update` from Studio
 
