@@ -54,17 +54,38 @@ Team coordination: ░░░░░░░░░░   0% — no agent-to-agent com
 - [ ] Go Dev agent: watch for design changes → implement → test
 - [ ] Cross-agent wiki insight sharing
 
+## Team Structure (8 agents)
+
+```
+Human (creative direction + final approval)
+  ↓
+PM Agent (requirements → dispatch YAML → validate results)
+  ↓
+Studio Director (execute dispatch → coordinate → report)
+  ↓
+┌─────────┬──────────────┬──────────┬─────────┬──────────┐
+│  Design │     Art      │Engineering│  Go Dev │    QA    │
+│ mockups │   assets     │  Unity   │  server │  review  │
+│ UX/flow │  Flux/CN     │  C#/MCP  │  Go API │ compare  │
+│ states  │  postprocess │  prefab  │  test   │  score   │
+└─────────┴──────────────┴──────────┴─────────┴──────────┘
+        ↑                                         │
+        └────── Marketing (later) ────────────────┘
+```
+
 ## Automation Approach
 
 Not building a custom agent runtime. Using existing tools as agent hosts:
 
 | Agent | Host | Loop Trigger |
 |---|---|---|
+| PM | Claude Code CLI | milestone boundary, stakeholder input |
 | Art | Claude Code CLI (`claude -p`) | cron / task YAML queue |
-| Engineering | Claude Code CLI | message from Art (asset_delivery) |
+| Design | Claude Code CLI + PIL | PM requirement → mockup |
+| Engineering | Claude Code CLI | message from Art/Design |
 | QA | Script + Claude vision | post-build hook |
-| Studio | Hermes cron job | daily schedule |
-| Go Dev | Claude Code CLI | message from Design |
+| Studio | core/dispatch.py | PM's YAML |
+| Go Dev | Claude Code CLI | message from Design/PM |
 
 Each agent reads its AGENTS.md (schema) + wiki + skills before acting.
 Each agent writes back to wiki + skills after acting.
