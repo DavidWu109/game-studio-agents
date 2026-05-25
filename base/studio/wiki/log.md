@@ -29,6 +29,10 @@
 - Success criteria: human writes YAML, system does everything else
 
 ## [2026-05-25] update | dispatch-issues-v2
-- 5 issues from v0.7 dispatch: single-thread, wrong YAML match, permissions, panel name, no validation
-- Added execution summary: 4/12 tasks done, 3 QA reviews (6.3-6.5/10)
-- Common panel issues: text readability, safe area, background noise
+- 6 issues total: single-thread, YAML match, permissions, panel name, validation, report screenshots
+- All 6 fixed in core/dispatch.py + core/safety.py
+- Verified: 12/12 tasks completed on v07-deliverable dispatch
+
+## [2026-05-25] create | session-2026-05-24
+- Foundation day summary: 35 commits, 18 wiki pages, 10 skills, 3 core modules
+- Framework from zero to working dispatch runner in one session
