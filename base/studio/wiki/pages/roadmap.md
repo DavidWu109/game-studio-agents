@@ -54,14 +54,16 @@ Team coordination: ░░░░░░░░░░   0% — no agent-to-agent com
 - [ ] Go Dev agent: watch for design changes → implement → test
 - [ ] Cross-agent wiki insight sharing
 
-## Team Structure (8 agents)
+## Team Structure (9 agents)
 
 ```
-Human (creative direction + final approval)
+Human (创意总监: direction + final approval)
   ↓
-PM Agent (requirements → dispatch YAML → validate results)
+Product Manager (意图→需求→验收)
   ↓
-Studio Director (execute dispatch → coordinate → report)
+Project Manager (需求→dispatch YAML→跟进度→死任务恢复)
+  ↓
+Studio Director (执行 dispatch→资源协调→飞书通知)
   ↓
 ┌─────────┬──────────────┬──────────┬─────────┬──────────┐
 │  Design │     Art      │Engineering│  Go Dev │    QA    │
@@ -79,12 +81,13 @@ Not building a custom agent runtime. Using existing tools as agent hosts:
 
 | Agent | Host | Loop Trigger |
 |---|---|---|
-| PM | Claude Code CLI | milestone boundary, stakeholder input |
+| Product Manager | Claude Code CLI | human direction, QA results |
+| Project Manager | Claude Code CLI | PM requirements → write YAML, monitor dispatch |
 | Art | Claude Code CLI (`claude -p`) | cron / task YAML queue |
 | Design | Claude Code CLI + PIL | PM requirement → mockup |
 | Engineering | Claude Code CLI | message from Art/Design |
 | QA | Script + Claude vision | post-build hook |
-| Studio | core/dispatch.py | PM's YAML |
+| Studio Director | core/dispatch.py | PjM's YAML |
 | Go Dev | Claude Code CLI | message from Design/PM |
 
 Each agent reads its AGENTS.md (schema) + wiki + skills before acting.
