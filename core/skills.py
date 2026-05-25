@@ -118,11 +118,21 @@ def _unity_mcp_call(tool_name: str, input_data: dict, timeout: int = 30) -> Tupl
 
 
 def _unity_pre_check() -> Tuple[bool, str]:
-    ok, msg = _unity_mcp_call("gopoo-exec-menu",
-                               {"menuPath": "Help/About Unity"}, timeout=10)
-    if ok:
+    """Check MCP reachability without triggering any UI dialogs."""
+    import urllib.request
+    import urllib.error
+    try:
+        # Just HTTP GET the server root — no tool execution, no side effects
+        req = urllib.request.Request(f"{UNITY_MCP_URL}/")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return True, "Unity MCP reachable"
+    except urllib.error.HTTPError:
+        # 404/405 etc = server is alive, just doesn't serve GET on /
         return True, "Unity MCP reachable"
-    return False, f"Unity Editor 未运行 — 请先启动 Unity Editor\n{msg}"
+    except urllib.error.URLError:
+        return False, "Unity Editor 未运行 — 请先启动 Unity Editor"
+    except Exception as e:
+        return False, f"Unity MCP check failed: {e}"
 
 
 def _unity_refresh(args: dict) -> SkillResult:
