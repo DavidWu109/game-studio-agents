@@ -1,7 +1,7 @@
 # Studio Wiki Index (Base)
 
 > Cross-department coordination knowledge.
-> Last updated: 2026-05-25 | Total pages: 8 | Skills: 1
+> Last updated: 2026-05-25 | Total pages: 8 | Skills: 2
 
 ## Concepts
 
@@ -20,3 +20,4 @@
 ## Skills
 
 - `task-dispatch/` — Decompose goals into agent tasks with dependency graph, parallel/sequential execution
+- `industry-research/` — Two-layer research: industry standards (base) + competitor analysis (project)
