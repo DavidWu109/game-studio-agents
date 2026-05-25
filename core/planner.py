@@ -235,77 +235,34 @@ class Planner:
     def generate_plan(self, task: dict, knowledge: List[str]) -> Plan:
         task_input = task.get("input", "")
         safety = build_safety_prompt(self.agent)
-        knowledge_block = "\n\n---\n\n".join(knowledge) if knowledge else "(no wiki lessons found)"
+        # Compress knowledge to key points only — full text wastes thinking tokens
+        knowledge_summary = []
+        for k in knowledge[:3]:
+            lines = k.split("\n")
+            # Keep title + first 5 non-empty content lines
+            title = lines[0] if lines else ""
+            content_lines = [l for l in lines[1:] if l.strip() and not l.startswith("---")][:5]
+            knowledge_summary.append(title + "\n" + "\n".join(content_lines))
+        knowledge_block = "\n\n".join(knowledge_summary) if knowledge_summary else "(none)"
 
-        prompt = f"""You are a planning agent. Create a step-by-step plan for the following task.
+        prompt = f"""Create a YAML list of steps to complete this task. Each step has: id, description, instruction, expected_outcome, verify_command (optional).
 
-## Safety Rules
-{safety}
-
-## Relevant Wiki Knowledge (MUST read and apply)
+## Knowledge (apply these lessons)
 {knowledge_block}
 
 ## Task
 {task_input}
 
-## Instructions
-Create a plan as a YAML list of steps. Each step must have:
-- id: step_N_short_name
-- description: what this step does (1 sentence)
-- instruction: detailed instruction for the executor LLM (include file paths, line numbers, exact values)
-- expected_outcome: what success looks like
-- verify_command: shell command to verify success (optional but recommended)
-- verify_check: what to look for in verify output (optional)
-- depends_on: list of step IDs this depends on (optional)
+## Rules
+- One step per logical change. Include exact file paths in instruction.
+- The executor has tools: read_file, edit_file, bash. Write instructions accordingly.
+- Include verify_command (grep or bash) to confirm each edit worked.
+- Output ONLY a flat YAML list starting with "- id:". No other text."""
 
-Rules:
-1. Do NOT include a "read file" step — files are pre-loaded for the executor automatically.
-2. Each step must be DECISION COMPLETE: the executor should NOT need to explore or search.
-   Include exact file paths, exact old code, exact new code in the instruction.
-3. Each edit step MUST have a verify_command (e.g. grep for the new value).
-4. Apply ALL lessons from the wiki knowledge above — do NOT repeat known mistakes.
-5. Keep steps small: ONE logical change per step. "Fix gear icon" = 1 step, "Fix avatar" = 1 step.
-6. In the instruction field, include the EXACT old_string and new_string for edit_file calls.
-7. Last step should verify the overall result (e.g. compile check or file structure check).
-8. Aim for 5-8 steps for a complex task.
-
-Output ONLY the YAML list, no other text. Example:
-```yaml
-- id: step_1_fix_gear
-  description: Fix gear icon deformation
-  instruction: |
-    In Assets/Editor/GamePanelBuilder.cs, find this code:
-    ```
-    setRT.anchoredPosition = Vector2.zero;
-    ```
-    Replace with:
-    ```
-    setRT.sizeDelta = Vector2.zero;
-    ```
-    This fixes the deformation caused by sizeDelta conflicting with stretch anchors.
-  expected_outcome: Gear icon uses anchor-based sizing, no deformation
-  verify_command: "grep -n 'sizeDelta = Vector2.zero' Assets/Editor/GamePanelBuilder.cs"
-  verify_check: "sizeDelta = Vector2.zero"
-- id: step_2_fix_avatar
-  description: Fix avatar sprite path per sprite-path-gotcha
-  instruction: |
-    In Assets/Editor/GamePanelBuilder.cs, replace ALL occurrences of:
-    ```
-    TrySetSprite(pAvatarImg, "Art/Icons/avatar_poo_01");
-    ```
-    With:
-    ```
-    TrySetSprite(pAvatarImg, "Resources/Cards/avatar_poo_01");
-    ```
-    Reason: sprite-path-gotcha.md says Art/ paths return Sprite=False.
-  expected_outcome: Avatar uses Resources/ path
-  verify_command: "grep -c 'Art/Icons/avatar' Assets/Editor/GamePanelBuilder.cs"
-  verify_check: "0"
-  depends_on: [step_1_fix_gear]
-```"""
-
+        # Plan generation uses Flash (fast, no thinking overhead)
+        # Step execution uses V4 Pro (strong code generation)
         from core.provider import run_deepseek
-        result = run_deepseek(prompt, max_tokens=8192)
+        result = run_deepseek(prompt, model="deepseek-chat", max_tokens=8192)
 
         if result.text.startswith("ERROR:"):
             logger.error("Plan generation failed: %s", result.text[:200])
@@ -340,6 +297,9 @@ Output ONLY the YAML list, no other text. Example:
                              instruction=raw[:500],
                              expected_outcome="Task completed")]
 
+        # Handle nested {"steps": [...]} or flat [...]
+        if isinstance(data, dict):
+            data = data.get("steps", data.get("plan", []))
         if not isinstance(data, list):
             return [PlanStep(id="step_1_fallback",
                              description="Execute task directly (plan not a list)",
@@ -350,10 +310,23 @@ Output ONLY the YAML list, no other text. Example:
         for item in data:
             if not isinstance(item, dict):
                 continue
+            # Flexible field names: id/name, instruction/action/changes
+            step_id = item.get("id", item.get("name", f"step_{len(steps)+1}"))
+            step_id = re.sub(r'[^a-zA-Z0-9_]', '_', str(step_id))[:40]
+            instruction = item.get("instruction", "")
+            if not instruction:
+                # Fallback: build instruction from other fields
+                parts = []
+                if item.get("action"): parts.append(str(item["action"]))
+                if item.get("changes"): parts.append(str(item["changes"]))
+                if item.get("target"): parts.append(f"Target: {item['target']}")
+                if item.get("file"): parts.append(f"File: {item['file']}")
+                instruction = "\n".join(parts) if parts else item.get("description", "")
+
             steps.append(PlanStep(
-                id=item.get("id", f"step_{len(steps)+1}"),
+                id=step_id,
                 description=item.get("description", ""),
-                instruction=item.get("instruction", ""),
+                instruction=instruction,
                 expected_outcome=item.get("expected_outcome", ""),
                 verify_command=item.get("verify_command"),
                 verify_check=item.get("verify_check"),
@@ -594,7 +567,7 @@ Error: {failure_context[:500]}
 4. Output ONLY a YAML list of revised steps (same format as before)
 """
 
-        result = run_deepseek(prompt, max_tokens=8192)
+        result = run_deepseek(prompt, model="deepseek-chat", max_tokens=8192)
         if result.text.startswith("ERROR:"):
             logger.error("Replan failed: %s", result.text[:200])
             return None

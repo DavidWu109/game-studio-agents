@@ -136,6 +136,11 @@ TOOL_SCHEMAS = [
 # Tool executors
 # ---------------------------------------------------------------------------
 
+def _get_path_arg(args: dict) -> str:
+    """Extract path from args, handling variant field names from different LLMs."""
+    return args.get("path") or args.get("filePath") or args.get("file_path") or args.get("file", "")
+
+
 def _resolve_path(path: str, cwd: str) -> Path:
     p = Path(os.path.expanduser(path))
     if not p.is_absolute():
@@ -144,7 +149,7 @@ def _resolve_path(path: str, cwd: str) -> Path:
 
 
 def _exec_read_file(args: dict, cwd: str, agent: str) -> str:
-    path = _resolve_path(args["path"], cwd)
+    path = _resolve_path(_get_path_arg(args), cwd)
     if not path.exists():
         return f"ERROR: file not found: {path}"
     if not path.is_file():
@@ -166,7 +171,7 @@ def _exec_read_file(args: dict, cwd: str, agent: str) -> str:
 
 
 def _exec_write_file(args: dict, cwd: str, agent: str) -> str:
-    path = _resolve_path(args["path"], cwd)
+    path = _resolve_path(_get_path_arg(args), cwd)
     if not check_write_allowed(agent, str(path)):
         return f"SAFETY_BLOCK: agent '{agent}' is not allowed to write to {path}"
     try:
@@ -178,7 +183,7 @@ def _exec_write_file(args: dict, cwd: str, agent: str) -> str:
 
 
 def _exec_edit_file(args: dict, cwd: str, agent: str) -> str:
-    path = _resolve_path(args["path"], cwd)
+    path = _resolve_path(_get_path_arg(args), cwd)
     if not check_write_allowed(agent, str(path)):
         return f"SAFETY_BLOCK: agent '{agent}' is not allowed to write to {path}"
     if not path.exists():
