@@ -37,6 +37,11 @@
 - Foundation day summary: 35 commits, 18 wiki pages, 10 skills, 3 core modules
 - Framework from zero to working dispatch runner in one session
 
+## [2026-05-25] create | dispatch-daemon
+- Hermes cron-based dispatch monitoring (5-min poll)
+- Auto-reset stale in_progress tasks on startup (Issue #7 fix)
+- Future upgrade path: custom daemon with file watcher
+
 ## [2026-05-25] create | wiki-lifecycle
 - Page lifecycle: active → stale → archived (never deleted)
 - What to archive (sessions, dispatch logs, version reviews) vs never archive (concepts, routing, skills)
