@@ -11,3 +11,8 @@
 - Created: self-review-failure.md
 - Updated: ui-mockup checklist expanded from 16 to 24 items
 - Rule: self-review is non-negotiable, must complete before delivery
+
+## [2026-05-25] ingest | industry-player-hand-display
+- Source: web research on Hearthstone, Exploding Kittens, Slay the Spire, UNO
+- Key finding: ZERO major card games use hard divider line between table and hand
+- Pattern: shadow gradient or no boundary, fan/arc layout, bottom screen
