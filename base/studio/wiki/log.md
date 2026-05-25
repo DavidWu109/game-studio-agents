@@ -92,3 +92,11 @@
 ## [2026-05-25] update | session-2026-05-25 Session 3 handoff
 - Multi-provider + plan-and-execute + tool runner all running
 - Next: tune plan generation (only 1 step instead of 5-8), GamePanel rewrite, QA feedback loop
+
+## [2026-05-26] create | session-2026-05-26
+- Skill layer (core/skills.py): 10 skills, SkillRegistry, pre-check pattern
+- Planner tuning: V4 Pro all phases, simplified prompt, YAML parse compat
+- MCP HTTP direct: urllib replaces npx, 10x faster, UNITY_MCP_URL configurable
+- Tuanjie auto-launch via unity_control.ensure_running
+- Dispatch refactored: run_qa_review + run_studio_report use skills
+- 5 commits, next: GamePanel QA screenshot verification

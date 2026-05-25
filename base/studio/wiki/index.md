@@ -1,7 +1,7 @@
 # Studio Wiki Index (Base)
 
 > Cross-department coordination knowledge.
-> Last updated: 2026-05-25 | Total pages: 12 | Skills: 2
+> Last updated: 2026-05-26 | Total pages: 13 | Skills: 2
 
 ## Architecture
 
@@ -30,6 +30,8 @@
 ## Sessions
 
 - [[session-2026-05-24]] — Foundation day: framework + dispatch + wiki + 35 commits
+- [[session-2026-05-25]] — Dispatch v2, mockup pipeline, architecture stubs, 30 commits
+- [[session-2026-05-26]] — Skill layer, planner tuning, MCP HTTP direct, 5 commits
 
 ## Skills
 
