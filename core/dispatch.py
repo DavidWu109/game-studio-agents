@@ -237,8 +237,64 @@ Score each section 0-10. Return ONLY this JSON:
 
 
 def run_studio_report(task: dict) -> str:
-    """Collect all task results and send Feishu summary."""
-    return "report"
+    """Collect all results, build screenshot grid, send Feishu report with images."""
+    from PIL import Image, ImageDraw
+
+    # Collect screenshots (QA captures + art finals)
+    screenshots = {}
+    runs_dir = COMFYUI_DIR / "runs"
+
+    # Find QA screenshots (newest per panel name)
+    for f in sorted(runs_dir.glob("qa_*.png"), key=lambda p: p.stat().st_mtime):
+        for panel in ["GamePanel", "MainMenuPanel", "LobbyPanel", "ResultPanel"]:
+            if panel.lower() in f.name.lower():
+                screenshots[panel] = f
+
+    # Find art finals from recent runs
+    for run_dir in sorted(runs_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+        if not run_dir.is_dir():
+            continue
+        for final in run_dir.rglob("final.png"):
+            name = run_dir.name
+            if name not in screenshots:
+                screenshots[name] = final
+            if len(screenshots) >= 8:
+                break
+
+    if not screenshots:
+        return "report: no screenshots found"
+
+    # Build grid
+    items = list(screenshots.items())[:8]
+    cols = min(len(items), 2)
+    rows = (len(items) + cols - 1) // cols
+    thumb_w, thumb_h = 640, 360
+    grid = Image.new("RGB", (cols * thumb_w, rows * thumb_h + 40), (30, 30, 30))
+    draw = ImageDraw.Draw(grid)
+    draw.text((10, 8), f"Dispatch Report — {len(items)} screenshots", fill="white")
+
+    for i, (name, path) in enumerate(items):
+        try:
+            img = Image.open(path).resize((thumb_w, thumb_h), Image.LANCZOS)
+        except Exception:
+            img = Image.new("RGB", (thumb_w, thumb_h), (60, 60, 60))
+        x = (i % cols) * thumb_w
+        y = (i // cols) * thumb_h + 40
+        grid.paste(img, (x, y))
+        draw.text((x + 5, y + 3), name, fill="yellow")
+
+    grid_path = runs_dir / f"dispatch_report_{int(time.time())}.png"
+    grid.save(grid_path)
+
+    # Send via Feishu
+    try:
+        sys.path.insert(0, str(COMFYUI_DIR))
+        from autoresearch.feishu_notify import send_image
+        send_image("Studio", f"📋 Dispatch 截图报告 ({len(items)} panels)", str(grid_path))
+    except Exception as e:
+        logger.warning("Report image send failed: %s", e)
+
+    return f"report sent with {len(items)} screenshots: {[n for n,_ in items]}"
 
 
 HANDLERS: Dict[tuple, Callable] = {
