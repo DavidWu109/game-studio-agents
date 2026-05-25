@@ -90,21 +90,31 @@ def _notify_skill_failure(skill_name: str, message: str):
 # Unity Control Skill
 # ---------------------------------------------------------------------------
 
+UNITY_MCP_URL = os.environ.get("UNITY_MCP_URL", "http://localhost:25891")
+
+
 def _unity_mcp_call(tool_name: str, input_data: dict, timeout: int = 30) -> Tuple[bool, str]:
+    import urllib.request
+    import urllib.error
+
+    url = f"{UNITY_MCP_URL}/api/tools/{tool_name}"
+    body = json.dumps(input_data).encode("utf-8")
+    req = urllib.request.Request(url, data=body, method="POST",
+                                 headers={"Content-Type": "application/json"})
     try:
-        result = subprocess.run(
-            ["npx", "--yes", "unity-mcp-cli", "run-tool", tool_name,
-             "--input", json.dumps(input_data)],
-            capture_output=True, text=True, timeout=timeout,
-            cwd=str(GOPOO_CLIENT))
-        output = result.stdout + result.stderr
-        if "Connection refused" in output or result.returncode != 0:
-            return False, f"MCP call failed: {output[:300]}"
-        return True, output[:500]
-    except subprocess.TimeoutExpired:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            status = data.get("status", "")
+            if status == "success":
+                result_text = json.dumps(data.get("structured", data), ensure_ascii=False)
+                return True, result_text[:500]
+            return False, f"MCP returned status={status}: {json.dumps(data)[:300]}"
+    except urllib.error.URLError as e:
+        return False, f"MCP connection failed: {e.reason}"
+    except TimeoutError:
         return False, f"MCP call timed out after {timeout}s"
-    except FileNotFoundError:
-        return False, "npx or unity-mcp-cli not found"
+    except Exception as e:
+        return False, f"MCP call error: {e}"
 
 
 def _unity_pre_check() -> Tuple[bool, str]:
@@ -148,20 +158,25 @@ def _unity_ensure_running(args: dict) -> SkillResult:
     if ok:
         return SkillResult(True, "Unity already running")
 
-    # Try to launch Unity
-    unity_paths = [
-        "/Applications/Unity/Hub/Editor/*/Unity.app/Contents/MacOS/Unity",
-        "/Applications/Unity Hub.app",
-    ]
+    # Try to launch Unity/Tuanjie via macOS `open` command
     import glob
-    for pattern in unity_paths:
-        matches = glob.glob(pattern)
-        if matches:
-            subprocess.Popen([matches[0]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            logger.info("Launched Unity: %s", matches[0])
-            break
+    editor_candidates = (
+        glob.glob("/Applications/Tuanjie/Tuanjie.app") +
+        glob.glob("/Applications/Unity/Hub/Editor/*/Unity.app") +
+        glob.glob("/Applications/Unity*.app")
+    )
+    project = str(GOPOO_CLIENT)
+    if editor_candidates:
+        app = editor_candidates[0]
+        subprocess.Popen(["open", "-a", app, "--args", "-projectPath", project],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        logger.info("Launched editor: %s with project %s", app, project)
+    elif Path("/Applications/Unity Hub.app").exists():
+        subprocess.Popen(["open", "-a", "Unity Hub"],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        logger.info("Launched Unity Hub")
     else:
-        return SkillResult(False, "Cannot find Unity installation to launch")
+        return SkillResult(False, "Cannot find Unity/Tuanjie installation")
 
     # Wait for MCP to become reachable
     for attempt in range(12):
@@ -186,6 +201,11 @@ def _qa_capture(args: dict) -> SkillResult:
     out_path = args.get("out_path")
     if not out_path:
         out_path = str(COMFYUI_DIR / "runs" / f"qa_{panel_name}_{int(time.time())}.png")
+
+    # Ensure correct scene is loaded before capture
+    _unity_mcp_call("gopoo-open-scene",
+                     {"scenePath": "Assets/Scenes/GameScene.unity"}, timeout=15)
+    time.sleep(2)
 
     ok, msg = _unity_mcp_call("gopoo-capture-panel",
                                {"panelName": panel_name,
