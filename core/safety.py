@@ -78,6 +78,17 @@ AGENT_BOUNDARIES = {
             "rm -rf",
         ],
     },
+    "design": {
+        "writable_dirs": [
+            "~/Projects/gopoo-studio-project/design/",
+            "~/Projects/comfyui_workflow/mockups/",
+        ],
+        "readable_dirs": ["*"],
+        "forbidden_actions": [
+            "git push",
+            "rm -rf",
+        ],
+    },
     "go-dev": {
         "writable_dirs": [
             "~/Projects/go-poo-server/",

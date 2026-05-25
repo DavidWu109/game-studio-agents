@@ -297,9 +297,40 @@ def run_studio_report(task: dict) -> str:
     return f"report sent with {len(items)} screenshots: {[n for n,_ in items]}"
 
 
+def run_design_code(task: dict) -> str:
+    """Run Design agent code tasks (mockup scripts, PIL composites)."""
+    from core.safety import build_safety_prompt
+    task_input = task.get("input", "")
+    knowledge = _gather_knowledge("design")
+    safety = build_safety_prompt("engineering")
+
+    prompt = f"""{knowledge}
+
+{safety}
+
+Task: {task_input}
+
+After making changes, report what you changed concisely.
+"""
+    project_dir = Path(os.path.expanduser("~/Projects/gopoo-studio-project"))
+    result = subprocess.run(
+        ["claude", "--dangerously-skip-permissions", "-p", prompt,
+         "--output-format", "json"],
+        capture_output=True, text=True, timeout=600,
+        cwd=str(project_dir))
+    if result.returncode != 0:
+        return f"claude failed (exit {result.returncode}): {result.stderr[:300]}"
+    try:
+        wrapper = json.loads(result.stdout)
+        return wrapper.get("result", "")[:500]
+    except json.JSONDecodeError:
+        return result.stdout[:500]
+
+
 HANDLERS: Dict[tuple, Callable] = {
     ("art", "iterate"): run_art_iterate,
     ("art", "generate"): run_art_iterate,
+    ("design", "code"): run_design_code,
     ("engineering", "code"): run_engineering_code,
     ("qa", "review"): run_qa_review,
     ("studio", "report"): run_studio_report,
