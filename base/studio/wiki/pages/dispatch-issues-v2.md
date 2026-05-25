@@ -88,6 +88,20 @@ or wrong YAML match — dispatch doesn't verify the result makes sense.
 - Art: check "score=" in result
 - QA: check JSON parseable with "sections" key
 
+## Issue 6: Report Handler Doesn't Send Screenshots
+
+**Symptom**: Final Feishu report was text-only. QA captured screenshots
+but they were never sent to the user.
+
+**Root Cause**: `run_studio_report()` just returns "report" — doesn't
+collect QA screenshots or art finals and attach to Feishu message.
+
+**Fix**: Report handler should:
+1. Find all `qa_*.png` screenshots from this dispatch run
+2. Find all art `final.png` outputs
+3. Build a grid image
+4. Send via `send_image()` to Feishu
+
 ## Priority After Dispatch Completes
 
 1. **Issue 2** (wrong YAML match) — quick fix, prevents wasted compute
