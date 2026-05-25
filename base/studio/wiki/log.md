@@ -36,3 +36,8 @@
 ## [2026-05-25] create | session-2026-05-24
 - Foundation day summary: 35 commits, 18 wiki pages, 10 skills, 3 core modules
 - Framework from zero to working dispatch runner in one session
+
+## [2026-05-25] create | wiki-lifecycle
+- Page lifecycle: active → stale → archived (never deleted)
+- What to archive (sessions, dispatch logs, version reviews) vs never archive (concepts, routing, skills)
+- Lint checks: staleness (90d), orphans, contradictions, index drift, superseded content
