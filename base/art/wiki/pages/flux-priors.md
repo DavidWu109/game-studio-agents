@@ -3,7 +3,7 @@ title: Flux Model Priors and Workarounds
 created: 2026-05-24
 updated: 2026-05-24
 type: concept
-tags: [flux, prompt, cfg, controlnet]
+tags: [sprite-pipeline, generation, model-behavior, prompt-engineering, flux]
 sources: [comfyui_workflow/DEBUG_LESSONS.md]
 confidence: high
 ---

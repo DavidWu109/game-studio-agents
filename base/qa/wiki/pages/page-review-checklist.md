@@ -3,7 +3,7 @@ title: Game UI Page Review Checklist
 created: 2026-05-25
 updated: 2026-05-25
 type: concept
-tags: [review, checklist, layout, ui, quality]
+tags: [review, quality-gate, layout, touch-zone, text-rendering, checklist]
 sources: [GamePanel 9-round iteration 2026-05-25]
 confidence: high
 ---

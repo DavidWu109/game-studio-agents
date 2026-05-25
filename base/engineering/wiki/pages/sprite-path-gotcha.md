@@ -3,7 +3,7 @@ title: Sprite Loading Path — Assets/ vs Resources/
 created: 2026-05-25
 updated: 2026-05-25
 type: concept
-tags: [unity, sprite, asset-loading, gotcha]
+tags: [asset-loading, engine-gotcha, sprite, unity]
 sources: [GamePanel iteration 2026-05-25]
 confidence: high
 ---

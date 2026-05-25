@@ -3,7 +3,7 @@ title: Unity/Tuanjie Common Gotchas
 created: 2026-05-24
 updated: 2026-05-24
 type: concept
-tags: [unity, tuanjie, gotcha, compile, refresh]
+tags: [build-pipeline, asset-loading, engine-gotcha, compile, unity]
 sources: [comfyui_workflow/DEBUG_LESSONS.md]
 confidence: high
 ---

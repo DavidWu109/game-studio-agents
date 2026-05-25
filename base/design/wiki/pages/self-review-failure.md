@@ -3,7 +3,7 @@ title: Self-Review Must Not Be Skipped
 created: 2026-05-25
 updated: 2026-05-25
 type: concept
-tags: [review, process, discipline, lesson]
+tags: [review, process, discipline, quality-gate, lesson]
 sources: [GamePanel mockup v2 human review 2026-05-25]
 confidence: high
 ---

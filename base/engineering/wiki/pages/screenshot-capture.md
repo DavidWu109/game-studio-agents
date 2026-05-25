@@ -3,7 +3,7 @@ title: Screenshot Capture Methods
 created: 2026-05-24
 updated: 2026-05-24
 type: concept
-tags: [unity, screenshot, tmp-text, camera, play-mode]
+tags: [build-pipeline, screenshot, rendering, engine-gotcha, unity]
 sources: [comfyui_workflow/DEBUG_LESSONS.md]
 confidence: high
 ---

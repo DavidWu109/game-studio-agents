@@ -3,7 +3,7 @@ title: Post-Processing - Color Keying vs rembg
 created: 2026-05-24
 updated: 2026-05-24
 type: concept
-tags: [color-key, rembg, alpha, post-process]
+tags: [sprite-pipeline, post-process, alpha-transparency, background-removal, color-key]
 sources: [comfyui_workflow/DEBUG_LESSONS.md]
 confidence: high
 ---

@@ -3,7 +3,7 @@ title: Evaluator Calibration — Checklist vs Holistic Scoring
 created: 2026-05-24
 updated: 2026-05-24
 type: concept
-tags: [evaluator, scoring, calibration, checklist]
+tags: [scoring, review, automation, quality-gate, evaluator-design]
 sources: [tense_v2 run 2026-05-24]
 confidence: high
 ---

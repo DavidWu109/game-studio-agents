@@ -3,7 +3,7 @@ title: ControlNet for UI Asset Generation
 created: 2026-05-24
 updated: 2026-05-24
 type: concept
-tags: [controlnet, mask, flux, vae]
+tags: [sprite-pipeline, generation, shape-control, controlnet, mask]
 sources: [comfyui_workflow/DEBUG_LESSONS.md]
 confidence: high
 ---

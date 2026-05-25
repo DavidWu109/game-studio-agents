@@ -3,7 +3,7 @@ title: LoRA Behavior Patterns
 created: 2026-05-24
 updated: 2026-05-24
 type: concept
-tags: [lora, flux, style]
+tags: [sprite-pipeline, generation, style-control, lora]
 sources: [comfyui_workflow/DEBUG_LESSONS.md]
 confidence: high
 ---
