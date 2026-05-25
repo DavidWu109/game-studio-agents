@@ -54,14 +54,16 @@ Team coordination: ░░░░░░░░░░   0% — no agent-to-agent com
 - [ ] Go Dev agent: watch for design changes → implement → test
 - [ ] Cross-agent wiki insight sharing
 
-## Team Structure (9 agents)
+## Team Structure (10 agents)
 
 ```
-Human (创意总监: direction + final approval)
+Human (老板: approve/reject + gut feelings)
   ↓
-Product Manager (意图→需求→验收)
+Creative Director (分析"为什么不好" → 创意方案 + 推荐)
   ↓
-Project Manager (需求→dispatch YAML→跟进度→死任务恢复)
+Product Manager (方案→需求→验收标准)
+  ↓
+Project Manager (需求→dispatch YAML→跟进度)
   ↓
 Studio Director (执行 dispatch→资源协调→飞书通知)
   ↓
