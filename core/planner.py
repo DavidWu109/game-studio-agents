@@ -259,16 +259,15 @@ class Planner:
 - Include verify_command (grep or bash) to confirm each edit worked.
 - Output ONLY a flat YAML list starting with "- id:". No other text."""
 
-        # Plan generation uses Flash (fast, no thinking overhead)
-        # Step execution uses V4 Pro (strong code generation)
-        from core.provider import run_deepseek
-        result = run_deepseek(prompt, model="deepseek-chat", max_tokens=8192)
+        from core.provider import run_deepseek, DEEPSEEK_MODEL
+        result = run_deepseek(prompt, model=DEEPSEEK_MODEL, max_tokens=16384)
 
         if result.text.startswith("ERROR:"):
             logger.error("Plan generation failed: %s", result.text[:200])
             return Plan(task_id="", goal=task_input,
                         complexity=TaskComplexity.COMPLEX, steps=[])
 
+        logger.info("Plan raw output (%d chars): %s", len(result.text), result.text[:300])
         steps = self._parse_plan_yaml(result.text)
         return Plan(
             task_id="",
@@ -567,7 +566,8 @@ Error: {failure_context[:500]}
 4. Output ONLY a YAML list of revised steps (same format as before)
 """
 
-        result = run_deepseek(prompt, model="deepseek-chat", max_tokens=8192)
+        from core.provider import DEEPSEEK_MODEL
+        result = run_deepseek(prompt, model=DEEPSEEK_MODEL, max_tokens=16384)
         if result.text.startswith("ERROR:"):
             logger.error("Replan failed: %s", result.text[:200])
             return None
