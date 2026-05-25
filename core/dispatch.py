@@ -491,9 +491,47 @@ def _run_task(task: dict, yaml_path: Path, resources: ResourceManager) -> tuple[
             lock.release()
 
 
+def _reset_stale_in_progress(yaml_path: Path, max_age_seconds: int = 600):
+    """On startup, reset tasks stuck in_progress from a crashed previous run."""
+    with _yaml_lock:
+        data = load_dispatch(yaml_path)
+        now = datetime.now(timezone.utc)
+        reset_count = 0
+        for t in data["tasks"]:
+            if t.get("status") != "in_progress":
+                continue
+            started = t.get("started", "")
+            if started:
+                try:
+                    started_dt = datetime.fromisoformat(started)
+                    age = (now - started_dt).total_seconds()
+                    if age > max_age_seconds:
+                        logger.warning("Resetting stale task %s (in_progress for %ds)", t["id"], int(age))
+                        t["status"] = "planned"
+                        if "started" in t:
+                            del t["started"]
+                        reset_count += 1
+                except (ValueError, TypeError):
+                    t["status"] = "planned"
+                    reset_count += 1
+            else:
+                t["status"] = "planned"
+                reset_count += 1
+        if reset_count:
+            save_dispatch(yaml_path, data)
+            logger.info("Reset %d stale in_progress tasks", reset_count)
+        return reset_count
+
+
 def dispatch_loop(yaml_path: Path, poll_interval: int = 15, dry_run: bool = False):
     """Main dispatch loop with parallel execution."""
     yaml_path = Path(yaml_path).resolve()
+
+    # Recover from previous crash
+    reset_count = _reset_stale_in_progress(yaml_path)
+    if reset_count:
+        notify("Studio", f"🔄 恢复: 重置了 {reset_count} 个上次崩溃遗留的 in_progress 任务")
+
     data = load_dispatch(yaml_path)
     goal = data.get("goal", "unknown")
     total = len(data["tasks"])

@@ -102,6 +102,42 @@ collect QA screenshots or art finals and attach to Feishu message.
 3. Build a grid image
 4. Send via `send_image()` to Feishu
 
+## Issue 7: No Crash Recovery / Heartbeat
+
+**Symptom**: Dispatch process killed (context window limit, terminal close,
+system sleep) → tasks stuck in `in_progress` forever. No auto-restart.
+Human has to manually reset status and re-run.
+
+**Root Cause**: Dispatch runner is a one-shot process with no persistence
+layer. If the process dies, all state is lost. The YAML has `in_progress`
+tasks that will never complete.
+
+**Fix Options**:
+- A) Watchdog: separate process monitors dispatch, restarts if it dies
+- B) Cron-based: dispatch runs as a cron job, checks YAML each tick,
+     resumes from last state (already partially supported — `get_ready_tasks`
+     skips `done` tasks, just needs `in_progress` → `planned` reset)
+- C) Heartbeat file: dispatch writes a timestamp file every poll cycle.
+     External monitor checks — if stale > 2× poll_interval, restart.
+- D) `in_progress` timeout: on startup, any task `in_progress` for longer
+     than its TASK_TIMEOUT gets auto-reset to `planned`
+
+**Quick fix (D)**: Add to `dispatch_loop` startup:
+
+```python
+def reset_stale_in_progress(yaml_path, max_age_seconds=600):
+    data = load_dispatch(yaml_path)
+    for t in data["tasks"]:
+        if t.get("status") == "in_progress":
+            started = t.get("started", "")
+            if started:
+                age = (now - parse(started)).total_seconds()
+                if age > max_age_seconds:
+                    t["status"] = "planned"
+                    del t["started"]
+    save_dispatch(yaml_path, data)
+```
+
 ## Priority After Dispatch Completes
 
 1. **Issue 2** (wrong YAML match) — quick fix, prevents wasted compute
