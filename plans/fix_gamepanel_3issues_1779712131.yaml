@@ -1,0 +1,65 @@
+task_id: fix_gamepanel_3issues
+goal: "Fix 3 critical issues in Assets/Editor/GamePanelBuilder.cs:\n\n1. GEAR ICON\
+  \ DEFORMED: The settings button uses sizeDelta=(120,120) with\n   stretch anchors\
+  \ (0.01,0.91)-(0.09,0.99), causing deformation.\n "
+complexity: complex
+replan_count: 1
+created_at: '2026-05-25T12:28:51.548090+00:00'
+completed_at: ''
+knowledge_sources:
+- /Users/davidagent/Projects/game-studio-agents/base/engineering/wiki/pages/sprite-path-gotcha.md
+- /Users/davidagent/Projects/gopoo-studio-project/engineering/wiki/pages/gamepanel-review-log.md
+- /Users/davidagent/Projects/game-studio-agents/base/qa/wiki/pages/page-review-checklist.md
+- /Users/davidagent/Projects/game-studio-agents/base/engineering/wiki/pages/unity-gotchas.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-25.md
+steps:
+- id: step_1_read_file
+  description: Read GamePanelBuilder.cs and BuilderHelper.TrySetSprite to understand
+    current state
+  instruction: 'Read Assets/Editor/GamePanelBuilder.cs fully and note:
+
+    1. Settings button creation at lines 533-541 (gear icon)
+
+    2. Avatar TrySetSprite calls at lines 398, 1058, 1239 using path "Resources/Cards/avatar_poo_01"
+
+    3. Backdrop creation at lines 190-194
+
+    Also read Assets/Editor/BuilderHelper.cs lines 228-27'
+  expected_outcome: Full understanding of the three bug locations and TrySetSprite
+    path mechanics
+  verify_command: null
+  status: done
+  result: 'Now I have a complete picture. Here''s my report:
+
+
+    ---
+
+
+    ## Step 1 Complete — Bug Location Analysis
+
+
+    ### 1. Settings Button (line 533-541)
+
+
+    ```csharp
+
+    var settings = CreateButtonWithSprite(safe.transform'
+  error: ''
+  retry_count: 0
+- id: step_1_fallback
+  description: Execute task directly (plan parse failed)
+  instruction: 'All three fixes applied:
+
+
+    **1. Gear icon deformed** — Changed from stretch anchors (0.01,0.91)-(0.09,0.99)
+    which produced a non-square rect on portrait phones (86×154px) to point anchors
+    at (0.01, 0.96) with pivot top-left and fixed 80×80 sizeDelta. Guaranteed square.
+
+
+    **2. Avatar not showing** — Th'
+  expected_outcome: Task completed
+  verify_command: null
+  status: in_progress
+  result: ''
+  error: ''
+  retry_count: 0

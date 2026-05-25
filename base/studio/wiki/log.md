@@ -46,3 +46,49 @@
 - Page lifecycle: active → stale → archived (never deleted)
 - What to archive (sessions, dispatch logs, version reviews) vs never archive (concepts, routing, skills)
 - Lint checks: staleness (90d), orphans, contradictions, index drift, superseded content
+
+## [2026-05-25] architecture-analysis | Evaluated ReAct/Plan-Execute/Agentic-Search/Hierarchical patterns against current system; committed 4 interface stubs + ARCHITECTURE.md; wrote [[architecture-upgrade-plan]]
+
+## [2026-05-25] memory-intercept | Auto-memory purged, pending wiki triage
+- `test_architecture_note`: QA feedback loop should retry upstream tasks when score < 7.5
+- Action needed: review content, write to appropriate wiki page if valuable, discard if not
+
+## [2026-05-25] memory-intercept | New content needs wiki triage
+- `feedback_dispatch_lessons`: Dispatch automation parallel execution and dependency resolution lessons
+- `project_new_marketing_plan`: Soft launch strategy for GoPoo beta on TestFlight before App Store submission
+- Action: review inbox, write to appropriate dept wiki page, then delete from inbox
+
+## [2026-05-25] memory-intercept | New content needs wiki triage
+- `project_new_marketing_plan`: Soft launch strategy for GoPoo beta on TestFlight before App Store submission
+- Action: review inbox, write to appropriate dept wiki page, then delete from inbox
+
+## [2026-05-25] create | memory-intercept-hook
+- SessionEnd hook: intercept auto-memory → keyword compare against wiki → triage new content to inbox or silent discard
+- Files: comfyui_workflow/.claude/hooks/purge-memory.sh, .claude/settings.json
+
+## [2026-05-25] update | session-2026-05-25 afternoon handoff
+- GamePanel v0.7 fixes applied (not yet Unity-built), architecture stubs committed, memory-intercept hook live, wiki discipline in CLAUDE.md
+
+## [2026-05-25] create | provider-cost-analysis
+- Full cost comparison: DeepSeek V4 Pro vs Claude API vs Max 20x
+- Key finding: DeepSeek V4 Pro ≈ Sonnet quality at 1/12 price; Max weekly cap limits real Opus throughput to ~20K/month
+- Routing strategy: DeepSeek for 60% daily tasks, Max Opus for QA/architecture/creative
+- Implementation plan: core/provider.py with fallback escalation
+
+## [2026-05-25] create | agent-cli-references
+- Studied openai/codex, claude-code-cli, anthropics/claude-code for tool loop patterns
+- Key patterns: pre-inject context, decision-complete plans, tool call budget, batch reads
+
+## [2026-05-25] implement | core/provider.py + core/tool_runner.py + core/planner.py
+- Multi-provider routing (DeepSeek V4 Pro / CLI / SDK) with fallback escalation
+- Tool execution loop (read/write/edit/bash) with safety enforcement
+- Plan-and-Execute system: classify → gather knowledge → generate plan → execute with verify → replan
+- Critical fix: deepseek-chat was V4 Flash not V4 Pro; V4 Pro needs reasoning_content passback
+
+## [2026-05-25] implement | core/search.py filter_by_task
+- Implemented Phase A knowledge retrieval — sprite-path-gotcha.md now correctly found
+- Keyword extraction with stopwords, domain terms, CamelCase splitting
+
+## [2026-05-25] update | session-2026-05-25 Session 3 handoff
+- Multi-provider + plan-and-execute + tool runner all running
+- Next: tune plan generation (only 1 step instead of 5-8), GamePanel rewrite, QA feedback loop

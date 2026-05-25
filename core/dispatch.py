@@ -9,6 +9,25 @@ Fixes from v0.7 dispatch (dispatch-issues-v2.md):
 3. Parse panel name from task input for QA
 4. Result validation before marking done
 5. --dangerously-skip-permissions with proper flag ordering
+
+Architecture Interfaces (stubs at end of file):
+
+Interface #1 — QA Feedback Loop (ReAct at dispatch level)
+    After QA task completes, check score against QA_GATE_THRESHOLD.
+    If below, find upstream task → call agent.on_qa_feedback() → retry.
+    Constants: QA_GATE_THRESHOLD, MAX_QA_RETRIES
+    Functions: _handle_qa_feedback(), _find_upstream_task()
+
+Interface #2 — Dynamic Replan (Plan-and-Execute)
+    Dispatch loop checks replan triggers each round.
+    If fired, calls PjM agent's replan() → replaces planned tasks.
+    Constants: REPLAN_TRIGGERS
+    Functions: _check_replan_triggers(), _apply_replan()
+
+Interface #4 — Daemon hook
+    dispatch_loop() can be called by daemon.py instead of CLI main().
+    daemon.py watches for new YAML files and starts dispatch_loop() per file.
+    See: core/daemon.py (to be created)
 """
 
 from __future__ import annotations
@@ -141,35 +160,14 @@ def run_art_iterate(task: dict) -> str:
 
 
 def run_engineering_code(task: dict) -> str:
-    """Delegate code changes to Claude Code CLI."""
-    from core.safety import build_safety_prompt
-    task_input = task.get("input", "")
-    knowledge = _gather_knowledge("engineering")
-    safety = build_safety_prompt("engineering")
+    """Delegate code changes via planner (complex) or tool runner (simple)."""
+    from core.planner import Planner
 
-    prompt = f"""{knowledge}
-
-{safety}
-
-Task: {task_input}
-
-After making changes:
-1. Verify no compile errors
-2. Report what you changed concisely
-"""
-    # FIX #3: flag order matters — --dangerously-skip-permissions before -p
-    result = subprocess.run(
-        ["claude", "--dangerously-skip-permissions", "-p", prompt,
-         "--output-format", "json"],
-        capture_output=True, text=True, timeout=600,
-        cwd=str(GOPOO_CLIENT))
-    if result.returncode != 0:
-        return f"claude failed (exit {result.returncode}): {result.stderr[:300]}"
-    try:
-        wrapper = json.loads(result.stdout)
-        return wrapper.get("result", "")[:500]
-    except json.JSONDecodeError:
-        return result.stdout[:500]
+    planner = Planner(agent="engineering", cwd=str(GOPOO_CLIENT))
+    result = planner.run(task)
+    if result.text.startswith("ERROR:"):
+        return f"planner failed ({result.provider}): {result.text[:300]}"
+    return result.text[:500]
 
 
 def _parse_panel_name(task_input: str) -> str:
@@ -225,15 +223,11 @@ Evaluate against this checklist:
 Score each section 0-10. Return ONLY this JSON:
 {{"panel": "{panel_name}", "sections": {{"rendering": N, "text": N, "touch": N, "layout": N, "hierarchy": N, "players": N, "content": N, "consistency": N}}, "overall": N, "issues": ["..."], "recommendations": ["..."]}}
 """
-    result = subprocess.run(
-        ["claude", "--dangerously-skip-permissions", "-p", prompt,
-         "--output-format", "json"],
-        capture_output=True, text=True, timeout=300)
-    try:
-        wrapper = json.loads(result.stdout)
-        return wrapper.get("result", "")[:800]
-    except (json.JSONDecodeError, KeyError):
-        return f"QA eval output: {result.stdout[:500]}"
+    # QA always routes to CLI (hallucination risk too high for DeepSeek)
+    from core.provider import run_prompt
+    qa_task = dict(task, provider="cli")
+    result = run_prompt(prompt, qa_task)
+    return result.text[:800]
 
 
 def run_studio_report(task: dict) -> str:
@@ -298,33 +292,15 @@ def run_studio_report(task: dict) -> str:
 
 
 def run_design_code(task: dict) -> str:
-    """Run Design agent code tasks (mockup scripts, PIL composites)."""
-    from core.safety import build_safety_prompt
-    task_input = task.get("input", "")
-    knowledge = _gather_knowledge("design")
-    safety = build_safety_prompt("engineering")
+    """Run Design agent code tasks via planner (complex) or tool runner (simple)."""
+    from core.planner import Planner
 
-    prompt = f"""{knowledge}
-
-{safety}
-
-Task: {task_input}
-
-After making changes, report what you changed concisely.
-"""
     project_dir = Path(os.path.expanduser("~/Projects/gopoo-studio-project"))
-    result = subprocess.run(
-        ["claude", "--dangerously-skip-permissions", "-p", prompt,
-         "--output-format", "json"],
-        capture_output=True, text=True, timeout=600,
-        cwd=str(project_dir))
-    if result.returncode != 0:
-        return f"claude failed (exit {result.returncode}): {result.stderr[:300]}"
-    try:
-        wrapper = json.loads(result.stdout)
-        return wrapper.get("result", "")[:500]
-    except json.JSONDecodeError:
-        return result.stdout[:500]
+    planner = Planner(agent="design", cwd=str(project_dir))
+    result = planner.run(task)
+    if result.text.startswith("ERROR:"):
+        return f"planner failed ({result.provider}): {result.text[:300]}"
+    return result.text[:500]
 
 
 HANDLERS: Dict[tuple, Callable] = {
@@ -616,6 +592,140 @@ def dispatch_loop(yaml_path: Path, poll_interval: int = 15, dry_run: bool = Fals
     summary = "\n".join(lines)
     notify("Studio", f"📋 Dispatch 完了: {goal}\n\n{summary}")
     logger.info("Dispatch finished:\n%s", summary)
+
+
+# ---------------------------------------------------------------------------
+# Interface #1: QA Feedback Loop (ReAct at dispatch level)
+# ---------------------------------------------------------------------------
+# When implemented, call _handle_qa_feedback() after QA task completes in
+# the dispatch_loop's future-completion block (line ~598).
+# Insert between validate_result() and mark_status("done").
+
+QA_GATE_THRESHOLD = 7.5
+MAX_QA_RETRIES = 2
+
+
+def _find_upstream_task(data: dict, qa_task: dict) -> Optional[dict]:
+    """Find the engineering/art task that produced QA's input.
+
+    Walk depends_on chain backward from qa_task to find the first
+    non-QA task. Returns the task dict, or None.
+    """
+    # TODO: implement — traverse depends_on links in data["tasks"]
+    raise NotImplementedError
+
+
+def _extract_qa_score(result: str) -> Optional[float]:
+    """Parse overall score from QA result JSON.
+
+    QA results contain: {"sections": {...}, "overall": float, "issues": [...]}
+    Returns the 'overall' score, or None if unparseable.
+    """
+    try:
+        # QA result may be embedded in a larger string; find JSON block
+        import re as _re
+        match = _re.search(r'\{[^{}]*"overall"\s*:\s*([\d.]+)', result)
+        if match:
+            return float(match.group(1))
+    except (ValueError, AttributeError):
+        pass
+    return None
+
+
+def _handle_qa_feedback(yaml_path: Path, qa_task: dict, qa_result: str,
+                        data: dict) -> bool:
+    """Check QA score and retry upstream task if below threshold.
+
+    Returns True if a retry was scheduled, False if passed or exhausted retries.
+
+    Call site: dispatch_loop, after qa_task completes successfully.
+    Insert at ~line 598, before mark_status("done") for qa tasks:
+
+        if qa_task["agent"] == "qa" and qa_task["action"] == "review":
+            score = _extract_qa_score(result)
+            if score is not None and score < QA_GATE_THRESHOLD:
+                retried = _handle_qa_feedback(yaml_path, qa_task, result, data)
+                if retried:
+                    continue  # don't mark qa as done, upstream will re-run
+    """
+    # TODO: implement
+    # 1. _find_upstream_task(data, qa_task)
+    # 2. Check upstream.retry_count < MAX_QA_RETRIES
+    # 3. Call agent.on_qa_feedback(upstream, qa_result_parsed)
+    # 4. If revised: reset upstream to "planned" with new input, return True
+    # 5. If None or retries exhausted: escalate to human, return False
+    raise NotImplementedError
+
+
+# ---------------------------------------------------------------------------
+# Interface #2: Dynamic Replan (Plan-and-Execute)
+# ---------------------------------------------------------------------------
+# When implemented, call _check_replan_triggers() at the start of each
+# dispatch_loop round (line ~554), before get_ready_tasks().
+
+REPLAN_TRIGGERS = [
+    {"condition": "any_blocked_over_30min", "action": "pjm.replan"},
+    {"condition": "qa_failed_after_max_retries", "action": "pjm.escalate_and_replan"},
+    {"condition": "all_art_plateaued", "action": "pjm.replan"},
+]
+
+
+def _check_replan_triggers(yaml_path: Path, data: dict) -> Optional[str]:
+    """Evaluate replan trigger conditions against current dispatch state.
+
+    Returns trigger reason string if any condition is met, None otherwise.
+
+    Conditions to check:
+    - any_blocked_over_30min: task status=blocked, age > 1800s
+    - qa_failed_after_max_retries: QA task done with score < threshold
+      AND upstream retry_count >= MAX_QA_RETRIES
+    - all_art_plateaued: all art tasks done with plateau flag
+
+    Call site: dispatch_loop, at start of each round (line ~554):
+
+        trigger = _check_replan_triggers(yaml_path, data)
+        if trigger:
+            _apply_replan(yaml_path, data, trigger)
+    """
+    # TODO: implement — evaluate each REPLAN_TRIGGERS condition
+    return None
+
+
+def _apply_replan(yaml_path: Path, data: dict, trigger_reason: str):
+    """Invoke PjM agent's replan() and apply the revised task DAG.
+
+    1. Instantiate PjM agent
+    2. Call pjm.replan(data, trigger_reason)
+    3. If revised data returned, save_dispatch() with new tasks
+    4. Log the replan event
+    5. Notify Studio about the replan
+    """
+    # TODO: implement
+    # from core.agent import StudioAgent  # or PjMAgent subclass
+    # pjm = PjMAgent(...)
+    # revised = pjm.replan(data, trigger_reason)
+    # if revised: save_dispatch(yaml_path, revised)
+    raise NotImplementedError
+
+
+# ---------------------------------------------------------------------------
+# Task YAML Schema Extensions (for interfaces above)
+# ---------------------------------------------------------------------------
+# When implementing the interfaces, add these fields to task dicts:
+#
+#   retry_count: int      — incremented by _handle_qa_feedback()
+#   qa_score: float       — written by QA handler on completion
+#   plateau: bool         — set by art handler when AutoResearch plateaus
+#   replan_history: list  — appended by _apply_replan() with timestamps
+#
+# Example task with new fields:
+#   - id: gp_layout_fix
+#     agent: engineering
+#     action: code
+#     input: "..."
+#     status: done
+#     retry_count: 1
+#     qa_score: 7.8
 
 
 def main():

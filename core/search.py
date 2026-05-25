@@ -4,6 +4,19 @@ Usage:
     python3 -m core.search "sprite-pipeline"
     python3 -m core.search "touch-zone layout"
     python3 -m core.search "how to handle inventory display" --content
+
+Architecture Interfaces:
+
+Interface #3 — Agentic Search (search → evaluate → refine)
+    agentic_search(): LLM-in-the-loop retrieval that evaluates whether
+    results are sufficient, then refines query if not.
+    Called by: agent.load_relevant_lessons() (Phase B)
+
+    evaluate_results(): LLM judges result sufficiency for a given question.
+    Called by: agentic_search() internally.
+
+    filter_by_task(): Fast pre-filter by task name + issue keywords.
+    Called by: agent.load_relevant_lessons() (Phase A, no LLM needed)
 """
 
 from __future__ import annotations
@@ -87,6 +100,129 @@ def search_by_content(keywords: List[str], search_dirs: List[Path] = None) -> Li
 
     results.sort(key=lambda x: -x[1])
     return results
+
+
+# ---------------------------------------------------------------------------
+# Interface #3: Agentic Search (search → evaluate → refine)
+# ---------------------------------------------------------------------------
+
+
+def filter_by_task(task_name: str, issue_keywords: List[str] = None,
+                   search_dirs: List[Path] = None, max_results: int = 20
+                   ) -> List[Tuple[Path, float, str]]:
+    """Phase A: Fast pre-filter by task name and issue keywords. No LLM needed.
+
+    Returns (path, relevance_score, snippet) sorted by relevance.
+
+    Relevance scoring:
+    - task_name exact match in content: +1.0
+    - task_name partial match (e.g. "poop_emotions" matches "poop"): +0.5
+    - Each issue keyword match: +0.3
+    - Normalized to 0-1 range
+
+    Called by: agent.load_relevant_lessons() Phase A implementation.
+
+    Example:
+        results = filter_by_task("blank_button_template",
+                                 issue_keywords=["outline", "glossy", "flat"])
+        for path, score, snippet in results:
+            print(f"{score:.2f} {path.name}: {snippet}")
+    """
+    if search_dirs is None:
+        search_dirs = [BASE_DIR, PROJECT_DIR]
+    if issue_keywords is None:
+        issue_keywords = []
+
+    scored: dict[Path, tuple[float, str]] = {}
+
+    task_results = search_by_content([task_name], search_dirs)
+    for path, hits, snippet in task_results:
+        scored[path] = (hits * 1.0, snippet)
+
+    if issue_keywords:
+        kw_results = search_by_content(issue_keywords, search_dirs)
+        for path, hits, snippet in kw_results:
+            prev_score, prev_snippet = scored.get(path, (0.0, ""))
+            scored[path] = (prev_score + hits * 0.3, prev_snippet or snippet)
+
+    tag_words = [task_name] + issue_keywords
+    tag_results = search_by_tags(tag_words, search_dirs)
+    for path, tag_score, _ in tag_results:
+        prev_score, prev_snippet = scored.get(path, (0.0, ""))
+        scored[path] = (prev_score + tag_score * 0.5, prev_snippet)
+
+    ranked = [(p, s, snip) for p, (s, snip) in scored.items()]
+    ranked.sort(key=lambda x: -x[1])
+
+    if ranked:
+        max_score = ranked[0][1]
+        if max_score > 0:
+            ranked = [(p, s / max_score, snip) for p, s, snip in ranked]
+
+    return ranked[:max_results]
+
+
+def evaluate_results(question: str, results: List[str], context: str = ""
+                     ) -> dict:
+    """LLM evaluates whether search results sufficiently answer the question.
+
+    Returns:
+        {
+            "sufficient": bool,
+            "coverage": float,       # 0-1, how well results cover the question
+            "missing_aspects": [...], # what's not covered
+            "refined_query": str,     # suggested query to fill gaps (if not sufficient)
+        }
+
+    Called by: agentic_search() internally.
+
+    Implementation notes:
+        - Use Claude via subprocess (claude -p) or API
+        - Prompt: "Given these wiki results, does the information sufficiently
+          address: {question}? What aspects are missing?"
+        - Parse structured JSON response
+        - Budget: ~500 input tokens per call (keep results concise)
+    """
+    # TODO: implement — requires LLM call
+    raise NotImplementedError
+
+
+def agentic_search(question: str, context: str = "",
+                   search_dirs: List[Path] = None,
+                   max_rounds: int = 3) -> List[str]:
+    """Agentic search: search → evaluate → refine → search again.
+
+    Implements Anthropic's recommended agentic search pattern:
+    1. Initial search (tag + content)
+    2. LLM evaluates: "are these results sufficient?"
+    3. If not: LLM suggests refined query → search again
+    4. Repeat up to max_rounds
+    5. Return consolidated results
+
+    Args:
+        question: natural language question (e.g. "how to get flat matte
+                  cartoon button without glossy highlights")
+        context: additional context (e.g. current task, recent failures)
+        search_dirs: wiki directories to search
+        max_rounds: max search-evaluate-refine iterations
+
+    Returns:
+        List of relevant wiki page contents, deduplicated and ranked.
+
+    Call site: agent.load_relevant_lessons() Phase B:
+        from core.search import agentic_search
+        lessons = agentic_search(
+            question=f"lessons for {task['task_id']} about {', '.join(issues)}",
+            context=f"round {round_n}, score {score}",
+        )
+
+    Cost estimate: ~$0.01 per search (1 LLM call per round, 3 rounds max)
+    """
+    # TODO: implement
+    # Round 1: extract keywords from question → search_by_tags + search_by_content
+    # Round 2+: evaluate_results() → if not sufficient, use refined_query → search again
+    # Final: deduplicate, return page contents
+    raise NotImplementedError
 
 
 def main():

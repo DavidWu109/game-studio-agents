@@ -1,0 +1,61 @@
+task_id: fix_gamepanel_3issues
+goal: "Fix 3 critical issues in Assets/Editor/GamePanelBuilder.cs:\n\n1. GEAR ICON\
+  \ DEFORMED: The settings button uses sizeDelta=(120,120) with\n   stretch anchors\
+  \ (0.01,0.91)-(0.09,0.99), causing deformation.\n "
+complexity: complex
+replan_count: 0
+created_at: '2026-05-25T12:21:09.683251+00:00'
+completed_at: ''
+knowledge_sources:
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/dispatch-daemon.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/knowledge-routing.md
+- /Users/davidagent/Projects/game-studio-agents/base/art/wiki/pages/color-keying.md
+- /Users/davidagent/Projects/gopoo-studio-project/art/wiki/pages/v07-asset-review.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/wiki-lifecycle.md
+steps:
+- id: step_1_read_file
+  description: Read GamePanelBuilder.cs and BuilderHelper.cs to understand current
+    state
+  instruction: "Read Assets/Editor/GamePanelBuilder.cs (full file, 1265 lines) and\n\
+    Assets/Editor/BuilderHelper.cs (specifically TrySetSprite at ~line 228 and\nCreateButtonWithSprite\
+    \ at ~line 139). Confirm the three issues exist:\n1. Settings button at lines\
+    \ 533-541: anchors (0.01,0.91)-(0.09,0.99) = 0.08×0.08\n   norm"
+  expected_outcome: Confirmed understanding of all three issues and their root causes
+  verify_command: null
+  status: in_progress
+  result: ''
+  error: ''
+  retry_count: 0
+- id: step_2_verify_avatar_meta
+  description: Check avatar texture meta file to verify it's imported as Sprite type
+  instruction: 'Read Assets/Resources/Cards/avatar_poo_01.png.meta and Assets/Resources/Cards/avatar_frame.png.meta.
+
+    Check that textureType is set to Sprite (value 8 in meta files) and spriteMode
+    is not 0.
+
+    If textureType is not 8 (Sprite), this would cause LoadAssetAtPath<Sprite> to
+    return null
+
+    on the first attempt'
+  expected_outcome: Know whether avatar textures are correctly imported as Sprite
+    type
+  verify_command: grep -n 'textureType' Assets/Resources/Cards/avatar_poo_01.png.meta
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: step_3_fix_gear_icon
+  description: Fix settings button deformation by making anchors define a square area
+  instruction: 'In Assets/Editor/GamePanelBuilder.cs, fix the Settings button (lines
+    533-541).
+
+
+    Current code:
+
+    '
+  expected_outcome: ''
+  verify_command: null
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0

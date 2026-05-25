@@ -6,6 +6,27 @@ Two-layer knowledge architecture:
 
 Each department agent inherits from this and implements its own
 Generator/Executor/Evaluator/Synthesis for the AutoResearch loop.
+
+Architecture Interfaces (not yet implemented, stubs below):
+
+1. QA Feedback Loop (ReAct at dispatch level)
+   - dispatch.py handles retry; agent exposes on_qa_feedback() hook
+   - See: dispatch.py → QA_GATE_THRESHOLD, _handle_qa_feedback()
+
+2. Dynamic Replan (Plan-and-Execute)
+   - PjM agent exposes replan() method
+   - dispatch.py calls it when replan_triggers fire
+   - See: dispatch.py → REPLAN_TRIGGERS, _check_replan_triggers()
+
+3. Agentic Search (search → evaluate → refine)
+   - search.py exposes agentic_search() with LLM-in-the-loop
+   - generator reads via load_relevant_lessons() instead of full file scan
+   - See: search.py → agentic_search(), evaluate_results()
+
+4. Daemon + Message Bus (Hierarchical coordination)
+   - StudioDaemon in daemon.py watches dispatches + inbox
+   - agent.loop() becomes the per-agent autonomous tick
+   - See: daemon.py (to be created)
 """
 
 from __future__ import annotations
@@ -278,10 +299,103 @@ class StudioAgent:
                 parts.append(proj_schema.read_text(encoding="utf-8"))
         return "\n".join(parts)
 
+    # --- QA Feedback Hook (Interface #1: ReAct at dispatch level) ---
+    # dispatch.py calls this when QA scores below threshold for upstream task.
+    # Agent receives QA issues and returns revised input for retry.
+
+    def on_qa_feedback(self, original_task: dict, qa_result: dict) -> Optional[dict]:
+        """Receive QA feedback and return a revised task, or None to escalate.
+
+        Called by dispatch when a downstream QA task scores below QA_GATE_THRESHOLD
+        and this agent's task is the upstream that needs fixing.
+
+        Args:
+            original_task: the task dict that produced the failing output
+            qa_result: {"score": float, "issues": [...], "sections": {...}}
+
+        Returns:
+            Revised task dict with updated 'input' field incorporating QA feedback,
+            or None if the agent cannot self-correct (triggers escalation to human).
+
+        Implementation notes:
+            - Append QA issues to task input as structured feedback
+            - Load relevant wiki lessons for the failure mode
+            - Increment retry_count on the task
+            - MAX_QA_RETRIES = 2 (defined in dispatch.py)
+        """
+        raise NotImplementedError
+
+    # --- Replan Hook (Interface #2: Plan-and-Execute) ---
+    # Only PjM agent implements this. Called by dispatch when replan triggers fire.
+
+    def replan(self, dispatch_data: dict, trigger_reason: str) -> Optional[dict]:
+        """Dynamically revise the task DAG in response to execution state.
+
+        Only PjM agent should implement this. Other agents raise NotImplementedError.
+
+        Args:
+            dispatch_data: full YAML dispatch dict with current task statuses
+            trigger_reason: why replan was triggered (e.g. "task X blocked > 30min")
+
+        Returns:
+            Revised dispatch_data with updated/added/removed planned tasks,
+            or None if no changes needed.
+
+        Implementation notes:
+            - Read wiki lessons to understand WHY tasks are blocked
+            - May skip blocked tasks, split large tasks, or add new tasks
+            - Must preserve completed task results
+            - Only modifies tasks with status 'planned' or 'blocked'
+            - Should call self.load_lessons() for context
+        """
+        raise NotImplementedError
+
+    # --- Relevant Lesson Loading (Interface #3: Agentic Search) ---
+    # Replaces load_lessons() with filtered, relevance-ranked retrieval.
+
+    def load_relevant_lessons(self, task: dict, current_issues: Optional[list] = None) -> list:
+        """Load wiki lessons relevant to the current task and failure mode.
+
+        Upgrade path for load_lessons() — instead of loading all pages with
+        keyword-matching filenames, this filters by task_id, variant, and
+        issue keywords for higher precision as the wiki grows.
+
+        Args:
+            task: current task dict (has task_id, variant, checklist, etc.)
+            current_issues: list of issue strings from latest evaluation
+
+        Returns:
+            List of relevant lesson texts, ranked by relevance.
+
+        Implementation notes (Phase A — keyword filtering):
+            - Filter by task name match (exact)
+            - Filter by issue keyword overlap (fuzzy)
+            - Deduplicate across base + project layers
+            - Cap at 20 most relevant lessons to fit context window
+
+        Implementation notes (Phase B — agentic search):
+            - Use search.agentic_search() with LLM-in-the-loop
+            - LLM evaluates: "are these lessons sufficient for this task?"
+            - If not, LLM generates refined query → search again
+            - See: core/search.py → agentic_search()
+        """
+        return self.load_lessons()
+
     # --- Main Loop ---
 
     def loop(self):
-        """Agent's autonomous loop. Override for department-specific logic."""
+        """Agent's autonomous loop. Override for department-specific logic.
+
+        When daemon.py is implemented, this becomes the per-agent tick called
+        on a schedule (default 30s). The daemon calls agent.loop() for each
+        active department.
+
+        Implementation notes:
+            - Check inbox for cross-agent messages
+            - Check for pending tasks assigned to this department
+            - Execute ready tasks
+            - Run background_review if conversation context available
+        """
         messages = self.check_inbox()
         for msg in messages:
             self.receive_message(msg)

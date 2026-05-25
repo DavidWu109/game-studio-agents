@@ -1,0 +1,38 @@
+task_id: fix_gamepanel_3issues
+goal: "Fix 3 critical issues in Assets/Editor/GamePanelBuilder.cs:\n\n1. GEAR ICON\
+  \ DEFORMED: The settings button uses sizeDelta=(120,120) with\n   stretch anchors\
+  \ (0.01,0.91)-(0.09,0.99), causing deformation.\n "
+complexity: complex
+replan_count: 0
+created_at: '2026-05-25T15:43:52.209505+00:00'
+completed_at: '2026-05-25T15:44:26.198351+00:00'
+knowledge_sources:
+- /Users/davidagent/Projects/game-studio-agents/base/engineering/wiki/pages/sprite-path-gotcha.md
+- /Users/davidagent/Projects/gopoo-studio-project/engineering/wiki/pages/gamepanel-review-log.md
+- /Users/davidagent/Projects/game-studio-agents/base/qa/wiki/pages/page-review-checklist.md
+- /Users/davidagent/Projects/game-studio-agents/base/engineering/wiki/pages/unity-gotchas.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-25.md
+steps:
+- id: step_1_fix_gear_deformation
+  description: Fix gear icon deformation by removing sizeDelta and enabling preserveAspect
+  instruction: 'In Assets/Editor/GamePanelBuilder.cs, locate the code that builds
+    the gear/settings button''s RectTransform.
+
+    It currently sets sizeDelta = (120,120) with stretch anchors (0.01,0.91)-(0.09,0.99),
+    causing deformation.
+
+    Replace the sizeDelta assignment with Vector2.zero, and add `gearImg.preserveAspect
+    ='
+  expected_outcome: ''
+  verify_command: null
+  status: done
+  result: 'Done. Only one change needed:
+
+
+    - **Line 539**: Changed `setRT.sizeDelta = new Vector2(80, 80);` → `setRT.sizeDelta
+    = Vector2.zero;`
+
+
+    The `preserveAspect = true` was **already present** on line 540 (`s'
+  error: ''
+  retry_count: 0

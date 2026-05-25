@@ -1,0 +1,28 @@
+task_id: fix_gamepanel_3issues
+goal: "Fix 3 critical issues in Assets/Editor/GamePanelBuilder.cs:\n\n1. GEAR ICON\
+  \ DEFORMED: The settings button uses sizeDelta=(120,120) with\n   stretch anchors\
+  \ (0.01,0.91)-(0.09,0.99), causing deformation.\n "
+complexity: complex
+replan_count: 0
+created_at: '2026-05-25T14:41:03.551266+00:00'
+completed_at: ''
+knowledge_sources:
+- /Users/davidagent/Projects/game-studio-agents/base/engineering/wiki/pages/sprite-path-gotcha.md
+- /Users/davidagent/Projects/gopoo-studio-project/engineering/wiki/pages/gamepanel-review-log.md
+- /Users/davidagent/Projects/game-studio-agents/base/qa/wiki/pages/page-review-checklist.md
+- /Users/davidagent/Projects/game-studio-agents/base/engineering/wiki/pages/unity-gotchas.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-25.md
+steps:
+- id: step_1_fix_gear_icon_type
+  description: Fix gear icon deformation by switching Image.Type from Sliced to Simple
+    and using stretch anchors
+  instruction: 'In Assets/Editor/GamePanelBuilder.cs, find this code block at lines
+    535-540:
+
+    '
+  expected_outcome: ''
+  verify_command: null
+  status: in_progress
+  result: ''
+  error: ''
+  retry_count: 0
