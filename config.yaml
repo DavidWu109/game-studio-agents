@@ -1,0 +1,75 @@
+# Anvil Provider Configuration
+# Token budgets and model routing for each pipeline phase
+
+providers:
+  sdk:
+    models:
+      opus: "claude-opus-4-7-20250415"
+      sonnet: "claude-sonnet-4-6-20250514"
+      haiku: "claude-haiku-4-5-20251001"
+
+  deepseek:
+    base_url: "https://api.deepseek.com"
+    model: "deepseek-v4-pro"
+
+  cli:
+    # claude -p flags; override via CLAUDE_CLI_FLAGS env var
+    flags: ["claude", "--dangerously-skip-permissions", "-p"]
+    timeout: 600
+
+# Phase → provider + model + token budget
+phases:
+  classify:
+    provider: sdk
+    model: haiku
+    max_tokens: 256
+
+  plan:
+    provider: sdk
+    model: opus
+    max_tokens: 16384
+
+  execute:
+    provider: cli
+    max_tokens: 4096
+
+  replan:
+    provider: sdk
+    model: opus
+    max_tokens: 16384
+
+  qa_review:
+    provider: cli
+    max_tokens: 4096
+
+  simple:
+    provider: cli
+    max_tokens: 4096
+
+# Tier routing — default provider for (agent, action) pairs
+# Only used when task YAML doesn't specify provider explicitly
+# and the task is dispatched outside the planner pipeline
+tier_routing:
+  qa.review: cli
+  creative.decide: cli
+  creative.review: cli
+  engineering.code: deepseek
+  design.code: deepseek
+  art.iterate: deepseek
+  art.generate: deepseek
+  studio.report: cli
+
+# Cost per million tokens (USD)
+pricing:
+  deepseek:
+    input: 0.435
+    output: 0.87
+  haiku:
+    input: 0.80
+    output: 4.00
+  sonnet:
+    input: 3.0
+    output: 15.0
+  opus:
+    input: 15.0
+    output: 75.0

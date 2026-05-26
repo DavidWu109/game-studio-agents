@@ -34,8 +34,7 @@ try:
 except ImportError:
     yaml = None
 
-from core.provider import ProviderResult, run_cli, run_deepseek, _calc_cost
-from core.tool_runner import run_with_tools, DEEPSEEK_MODEL
+from core.provider import ProviderResult, run_phase
 from core.search import filter_by_task, search_by_content
 from core.safety import build_safety_prompt
 
@@ -136,16 +135,10 @@ class Planner:
         return result
 
     def _run_simple(self, task: dict) -> ProviderResult:
-        from core.provider import get_provider, run_cli
         task_input = task.get("input", "")
-        provider = get_provider(task)
-        if provider == "cli":
-            safety = build_safety_prompt(self.agent)
-            prompt = f"{safety}\n\nTask: {task_input}\n\nReport what you changed concisely."
-            return run_cli(prompt, cwd=self.cwd)
         safety = build_safety_prompt(self.agent)
         prompt = f"{safety}\n\nTask: {task_input}\n\nReport what you changed concisely."
-        return run_with_tools(prompt, agent=self.agent, cwd=self.cwd)
+        return run_phase("simple", prompt, cwd=self.cwd)
 
     # --- Phase 1: Complexity Classification ---
 
@@ -265,12 +258,7 @@ class Planner:
 - Include verify_command (grep or bash) to confirm each edit worked.
 - Output ONLY a flat YAML list starting with "- id:". No other text."""
 
-        from core.provider import run_deepseek, run_cli, get_provider, DEEPSEEK_MODEL
-        provider = get_provider(task)
-        if provider == "cli":
-            result = run_cli(f"{safety}\n\n{prompt}", cwd=self.cwd)
-        else:
-            result = run_deepseek(prompt, model=DEEPSEEK_MODEL, max_tokens=16384)
+        result = run_phase("plan", f"{safety}\n\n{prompt}", cwd=self.cwd)
 
         if result.text.startswith("ERROR:"):
             logger.error("Plan generation failed: %s", result.text[:200])
@@ -486,19 +474,7 @@ class Planner:
 - Be surgical: one edit_file call per change, using exact strings from the file above.
 - Report what you changed concisely."""
 
-        step_budget = 8
-        from core.provider import get_provider, run_cli
-        provider = get_provider(self._task) if self._task else "deepseek"
-        if provider == "cli":
-            result_pr = run_cli(prompt, cwd=self.cwd)
-            if result_pr.text.startswith("ERROR:"):
-                return False, result_pr.text
-            return True, result_pr.text
-
-        result = run_with_tools(
-            prompt, agent=self.agent, cwd=self.cwd,
-            provider_name="deepseek", max_rounds=step_budget,
-        )
+        result = run_phase("execute", prompt, cwd=self.cwd)
 
         if result.text.startswith("ERROR:"):
             return False, result.text
@@ -586,12 +562,7 @@ Error: {failure_context[:500]}
 4. Output ONLY a YAML list of revised steps (same format as before)
 """
 
-        from core.provider import DEEPSEEK_MODEL, get_provider, run_cli
-        provider = get_provider(self._task) if self._task else "deepseek"
-        if provider == "cli":
-            result = run_cli(prompt, cwd=self.cwd)
-        else:
-            result = run_deepseek(prompt, model=DEEPSEEK_MODEL, max_tokens=16384)
+        result = run_phase("replan", prompt, cwd=self.cwd)
         if result.text.startswith("ERROR:"):
             logger.error("Replan failed: %s", result.text[:200])
             return None
