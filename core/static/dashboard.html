@@ -4,320 +4,401 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Anvil Dashboard</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
-  --bg: #0a0a0f; --surface: #13131a; --border: #1e1e2e;
+  --bg: #0a0a0f; --surface: #13131a; --surface2: #1a1a24; --border: #1e1e2e;
   --text: #e0e0e8; --muted: #6b6b80; --accent: #6c5ce7;
   --green: #00b894; --yellow: #fdcb6e; --red: #e17055; --blue: #74b9ff;
+  --orange: #e88a4a;
 }
 body { font-family: -apple-system, 'SF Pro', system-ui, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
 /* Header */
-.header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
-.header h1 { font-size: 16px; font-weight: 600; }
+.header { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.header-left { display: flex; align-items: center; gap: 20px; }
+.header h1 { font-size: 15px; font-weight: 600; }
 .header h1 span { color: var(--accent); }
-.conn-status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.tabs { display: flex; gap: 2px; }
+.tab { padding: 5px 14px; font-size: 12px; border-radius: 4px; cursor: pointer; color: var(--muted); background: transparent; border: none; }
+.tab:hover { color: var(--text); }
+.tab.active { background: var(--accent); color: white; }
+.conn-status { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
 .conn-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); }
 .conn-dot.connected { background: var(--green); }
 
-/* Main layout */
-.main { flex: 1; display: grid; grid-template-columns: 200px 1fr 340px; overflow: hidden; }
+/* Views */
+.view { display: none; flex: 1; overflow: hidden; }
+.view.active { display: flex; }
 
-/* Left: Agents */
-.agents-panel { border-right: 1px solid var(--border); padding: 12px; overflow-y: auto; }
-.agents-panel h2 { font-size: 11px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; letter-spacing: 1px; }
-.agent-card { padding: 10px; border-radius: 8px; background: var(--surface); margin-bottom: 6px; border: 1px solid var(--border); }
-.agent-card .name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-.agent-card .status { font-size: 11px; display: flex; align-items: center; gap: 4px; }
-.agent-card .status .dot { width: 5px; height: 5px; border-radius: 50%; }
-.agent-card.idle .dot { background: var(--green); }
-.agent-card.busy .dot { background: var(--yellow); }
-.agent-card.failed .dot { background: var(--red); }
-.agent-card .task-info { font-size: 10px; color: var(--muted); margin-top: 4px; }
+/* ==================== OVERVIEW VIEW ==================== */
+#overviewView { flex-direction: column; }
 
-/* Center: Kanban */
-.kanban { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 12px; overflow-y: auto; }
-.kanban-col { background: var(--surface); border-radius: 8px; padding: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; }
-.kanban-col h3 { font-size: 11px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; letter-spacing: 1px; display: flex; justify-content: space-between; }
-.kanban-col h3 .count { background: var(--border); padding: 1px 6px; border-radius: 10px; font-size: 10px; }
-.kanban-cards { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
-.task-card { padding: 8px; border-radius: 6px; background: var(--bg); cursor: pointer; border: 1px solid transparent; transition: border-color 0.15s; }
-.task-card:hover { border-color: var(--accent); }
-.task-card.selected { border-color: var(--accent); background: #1a1a2e; }
-.task-card .task-id { font-size: 12px; font-weight: 600; }
-.task-card .task-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
-.task-card .badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 600; }
-.badge-art { background: #e17055; color: white; }
-.badge-engineering { background: #6c5ce7; color: white; }
-.badge-qa { background: #00b894; color: white; }
-.badge-design { background: #fdcb6e; color: #333; }
-.badge-studio { background: #74b9ff; color: #333; }
+.overview-top { flex: 1; display: grid; grid-template-columns: 220px 1fr 240px; overflow: hidden; }
 
-/* Right: Detail */
-.detail-panel { border-left: 1px solid var(--border); padding: 12px; overflow-y: auto; }
-.detail-panel h2 { font-size: 11px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; letter-spacing: 1px; }
-.detail-empty { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; }
-.detail-header { margin-bottom: 12px; }
-.detail-header .task-name { font-size: 15px; font-weight: 600; }
-.detail-header .detail-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+/* Pool cards */
+.pools-panel { border-right: 1px solid var(--border); padding: 12px; overflow-y: auto; }
+.pools-panel h2, .demands-panel h2, .resources-panel h2, .detail-panel h2, .agent-view-panel h2 { font-size: 11px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; letter-spacing: 1px; }
+.pool-card { padding: 10px; border-radius: 8px; background: var(--surface); margin-bottom: 6px; border: 1px solid var(--border); cursor: pointer; transition: border-color 0.15s; }
+.pool-card:hover { border-color: var(--accent); }
+.pool-card .pool-name { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.pool-card .pool-bar { height: 4px; border-radius: 2px; background: var(--border); margin-bottom: 4px; }
+.pool-card .pool-bar-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.3s; }
+.pool-card .pool-meta { font-size: 10px; color: var(--muted); }
 
-/* Phase indicator */
-.phases { display: flex; gap: 2px; margin: 12px 0; }
-.phase { flex: 1; text-align: center; padding: 4px; font-size: 10px; border-radius: 4px; background: var(--border); color: var(--muted); }
-.phase.active { background: var(--accent); color: white; }
-.phase.done { background: var(--green); color: white; }
+/* Demand queue */
+.demands-panel { padding: 12px; overflow-y: auto; }
+.demand-row { display: grid; grid-template-columns: 32px 1fr 120px 60px; align-items: center; padding: 8px 10px; border-radius: 6px; background: var(--surface); margin-bottom: 4px; cursor: pointer; border: 1px solid transparent; transition: border-color 0.15s; }
+.demand-row:hover { border-color: var(--accent); }
+.demand-priority { font-size: 11px; font-weight: 700; width: 24px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+.demand-priority.p0 { background: var(--red); color: white; }
+.demand-priority.p1 { background: var(--orange); color: white; }
+.demand-priority.p2 { background: var(--yellow); color: #333; }
+.demand-priority.p3 { background: var(--border); color: var(--muted); }
+.demand-title { font-size: 12px; font-weight: 500; margin-left: 8px; }
+.demand-progress { height: 4px; border-radius: 2px; background: var(--border); }
+.demand-progress-fill { height: 100%; border-radius: 2px; background: var(--green); transition: width 0.3s; }
+.demand-status { font-size: 10px; color: var(--muted); text-align: right; }
 
-/* Steps */
-.step { padding: 8px; border-radius: 6px; background: var(--bg); margin-bottom: 4px; border: 1px solid var(--border); cursor: pointer; }
-.step-header { display: flex; justify-content: space-between; align-items: center; }
-.step-header .step-name { font-size: 12px; font-weight: 500; }
-.step-status { font-size: 10px; padding: 1px 5px; border-radius: 3px; }
-.step-status.planned { background: var(--border); color: var(--muted); }
-.step-status.in_progress { background: var(--yellow); color: #333; }
-.step-status.done { background: var(--green); color: white; }
-.step-status.failed { background: var(--red); color: white; }
-.step-detail { display: none; margin-top: 6px; font-size: 11px; color: var(--muted); }
-.step-detail.open { display: block; }
-.step-detail pre { background: var(--surface); padding: 6px; border-radius: 4px; margin-top: 4px; overflow-x: auto; white-space: pre-wrap; font-size: 10px; }
-.step-cost { display: flex; gap: 8px; margin-top: 4px; font-size: 10px; color: var(--muted); }
+/* Resources */
+.resources-panel { border-left: 1px solid var(--border); padding: 12px; overflow-y: auto; }
+.resource-card { padding: 8px; border-radius: 6px; background: var(--surface); margin-bottom: 6px; border: 1px solid var(--border); }
+.resource-name { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.resource-status { font-size: 10px; color: var(--muted); }
 
-/* Activity log */
-.activity-log { margin-top: 12px; }
-.activity-log h2 { margin-bottom: 6px; }
-.activity-item { padding: 4px 8px; font-size: 11px; border-left: 2px solid var(--border); margin-bottom: 2px; color: var(--muted); }
-.activity-item.tool_call { border-left-color: var(--accent); }
-.activity-item.text { border-left-color: var(--blue); }
-.activity-item .tool-name { color: var(--accent); font-weight: 600; }
-.activity-item .timestamp { color: var(--border); font-size: 9px; margin-left: 4px; }
+/* ==================== DEMAND VIEW ==================== */
+#demandView { flex-direction: row; }
 
-/* Bottom: Stats */
+.graph-panel { flex: 1; position: relative; overflow: hidden; background: var(--bg); }
+.graph-panel svg { width: 100%; height: 100%; }
+.graph-back { position: absolute; top: 12px; left: 12px; padding: 5px 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 4px; cursor: pointer; font-size: 11px; z-index: 10; }
+.graph-title { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font-size: 14px; font-weight: 600; z-index: 10; }
+
+.demand-sidebar { width: 300px; border-left: 1px solid var(--border); padding: 12px; overflow-y: auto; }
+.demand-meta { margin-bottom: 12px; }
+.demand-meta dt { font-size: 10px; color: var(--muted); text-transform: uppercase; margin-top: 8px; }
+.demand-meta dd { font-size: 13px; }
+
+/* Graph nodes */
+.node circle { stroke-width: 2px; cursor: pointer; }
+.node text { font-size: 10px; fill: var(--text); pointer-events: none; }
+.node .agent-label { font-size: 8px; fill: var(--muted); }
+.link { stroke: var(--border); stroke-width: 1.5px; fill: none; marker-end: url(#arrowhead); }
+
+/* Node status colors */
+.node-planned circle { fill: var(--surface2); stroke: var(--muted); }
+.node-in_progress circle { fill: var(--surface2); stroke: var(--yellow); stroke-width: 3px; }
+.node-done circle { fill: var(--surface2); stroke: var(--green); }
+.node-blocked circle, .node-failed circle { fill: var(--surface2); stroke: var(--red); }
+
+/* ==================== AGENT VIEW ==================== */
+#agentView { flex-direction: row; }
+
+.agent-view-panel { flex: 1; padding: 12px; overflow-y: auto; }
+.agent-back { display: inline-block; padding: 5px 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 4px; cursor: pointer; font-size: 11px; margin-bottom: 12px; }
+.instance-card { padding: 10px; border-radius: 8px; background: var(--surface); margin-bottom: 6px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.instance-id { font-size: 13px; font-weight: 600; }
+.instance-status { font-size: 11px; padding: 2px 8px; border-radius: 3px; }
+.instance-status.idle { background: var(--green); color: white; }
+.instance-status.busy { background: var(--yellow); color: #333; }
+.instance-task { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.queue-section { margin-top: 16px; }
+.queue-item { padding: 6px 10px; font-size: 11px; color: var(--muted); border-left: 2px solid var(--border); margin-bottom: 2px; }
+
+/* ==================== STATS BAR ==================== */
 .stats-bar { display: flex; gap: 20px; padding: 8px 20px; border-top: 1px solid var(--border); background: var(--surface); font-size: 11px; }
 .stat { display: flex; align-items: center; gap: 4px; }
 .stat .label { color: var(--muted); }
 .stat .value { font-weight: 600; }
+
+/* Activity log (reused in demand sidebar) */
+.activity-log { margin-top: 12px; max-height: 200px; overflow-y: auto; }
+.activity-item { padding: 3px 6px; font-size: 10px; border-left: 2px solid var(--border); margin-bottom: 1px; color: var(--muted); }
+.activity-item.tool_call { border-left-color: var(--accent); }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <h1><span>Anvil</span> Dashboard</h1>
+  <div class="header-left">
+    <h1><span>Anvil</span> Dashboard</h1>
+    <div class="tabs">
+      <button class="tab active" onclick="switchView('overview')">Overview</button>
+      <button class="tab" onclick="switchView('demand')">Demand</button>
+      <button class="tab" onclick="switchView('agent')">Agent</button>
+    </div>
+  </div>
   <div class="conn-status">
     <div class="conn-dot" id="connDot"></div>
     <span id="connText">connecting...</span>
   </div>
 </div>
 
-<div class="main">
-  <!-- Left: Agent Status -->
-  <div class="agents-panel">
-    <h2>Agents</h2>
-    <div id="agentList"></div>
-  </div>
-
-  <!-- Center: Kanban -->
-  <div class="kanban">
-    <div class="kanban-col">
-      <h3>Planned <span class="count" id="countPlanned">0</span></h3>
-      <div class="kanban-cards" id="colPlanned"></div>
+<!-- ==================== OVERVIEW VIEW ==================== -->
+<div class="view active" id="overviewView">
+  <div class="overview-top">
+    <div class="pools-panel">
+      <h2>Agent Pools</h2>
+      <div id="poolsList"></div>
     </div>
-    <div class="kanban-col">
-      <h3>In Progress <span class="count" id="countInProgress">0</span></h3>
-      <div class="kanban-cards" id="colInProgress"></div>
+    <div class="demands-panel">
+      <h2>Demand Queue</h2>
+      <div id="demandsList"></div>
     </div>
-    <div class="kanban-col">
-      <h3>Done <span class="count" id="countDone">0</span></h3>
-      <div class="kanban-cards" id="colDone"></div>
-    </div>
-    <div class="kanban-col">
-      <h3>Blocked <span class="count" id="countBlocked">0</span></h3>
-      <div class="kanban-cards" id="colBlocked"></div>
-    </div>
-  </div>
-
-  <!-- Right: Detail -->
-  <div class="detail-panel">
-    <h2>Task Detail</h2>
-    <div id="detailContent">
-      <div class="detail-empty">Select a task to view details</div>
+    <div class="resources-panel">
+      <h2>Resources</h2>
+      <div id="resourcesList"></div>
+      <h2 style="margin-top:16px">Active Tasks</h2>
+      <div id="activeTasks" style="font-size:11px;color:var(--muted)">-</div>
     </div>
   </div>
 </div>
 
-<div class="stats-bar" id="statsBar">
+<!-- ==================== DEMAND VIEW ==================== -->
+<div class="view" id="demandView">
+  <div class="graph-panel">
+    <button class="graph-back" onclick="switchView('overview')">← Back</button>
+    <div class="graph-title" id="graphTitle"></div>
+    <svg id="graphSvg"></svg>
+  </div>
+  <div class="demand-sidebar" id="demandSidebar">
+    <h2>Demand Detail</h2>
+    <div id="demandDetail"></div>
+    <div class="activity-log">
+      <h2>Activity</h2>
+      <div id="demandActivity"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== AGENT VIEW ==================== -->
+<div class="view" id="agentView">
+  <div class="agent-view-panel">
+    <button class="agent-back" onclick="switchView('overview')">← Back</button>
+    <h2 id="agentViewTitle">Agent Pool</h2>
+    <div id="agentInstances"></div>
+    <div class="queue-section">
+      <h2>Waiting Queue</h2>
+      <div id="agentQueue"></div>
+    </div>
+  </div>
+</div>
+
+<div class="stats-bar">
+  <div class="stat"><span class="label">Demands:</span> <span class="value" id="statDemands">0</span></div>
   <div class="stat"><span class="label">Tasks:</span> <span class="value" id="statTasks">0</span></div>
   <div class="stat"><span class="label">Tokens:</span> <span class="value" id="statTokens">0</span></div>
   <div class="stat"><span class="label">Cost:</span> <span class="value" id="statCost">$0.00</span></div>
-  <div class="stat"><span class="label">Latency:</span> <span class="value" id="statLatency">0s</span></div>
 </div>
 
 <script>
-const AGENTS = ['art', 'engineering', 'design', 'qa', 'studio'];
-const COLS = { planned: 'colPlanned', in_progress: 'colInProgress', done: 'colDone', blocked: 'colBlocked', failed: 'colBlocked' };
-
-let tasks = {};
-let selectedTaskId = null;
 let lastEventId = 0;
+let currentView = 'overview';
+let selectedDemandId = null;
+let selectedAgentType = null;
 
-// --- Agent Cards ---
-function initAgents() {
-  const el = document.getElementById('agentList');
-  el.innerHTML = AGENTS.map(a => `
-    <div class="agent-card idle" id="agent-${a}">
-      <div class="name">${a}</div>
-      <div class="status"><div class="dot"></div> <span>idle</span></div>
-      <div class="task-info">-</div>
-    </div>
-  `).join('');
+const AGENT_COLORS = {
+  art: '#e17055', engineering: '#6c5ce7', qa: '#00b894',
+  design: '#fdcb6e', studio: '#74b9ff', 'go-dev': '#a29bfe',
+  pm: '#fab1a0', pjm: '#81ecec', cd: '#dfe6e9', marketing: '#ffeaa7'
+};
+
+// === View switching ===
+function switchView(view) {
+  currentView = view;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(view + 'View').classList.add('active');
+  document.querySelector(`.tab[onclick*="${view}"]`).classList.add('active');
+  if (view === 'overview') loadOverview();
+  if (view === 'demand' && selectedDemandId) loadDemandGraph(selectedDemandId);
+  if (view === 'agent' && selectedAgentType) loadAgentView(selectedAgentType);
 }
 
-function updateAgents() {
-  const busy = {};
-  Object.values(tasks).forEach(t => {
-    if (t.status === 'in_progress') busy[t.agent] = t.id;
-  });
-  AGENTS.forEach(a => {
-    const card = document.getElementById(`agent-${a}`);
-    if (!card) return;
-    const isBusy = busy[a];
-    card.className = `agent-card ${isBusy ? 'busy' : 'idle'}`;
-    card.querySelector('.status span').textContent = isBusy ? 'busy' : 'idle';
-    card.querySelector('.task-info').textContent = isBusy || '-';
-  });
+// === OVERVIEW ===
+async function loadOverview() {
+  const res = await fetch('/api/v2/overview');
+  const data = await res.json();
+
+  // Pools
+  const pools = data.pools || {};
+  document.getElementById('poolsList').innerHTML = Object.entries(pools).map(([type, p]) => {
+    const pct = p.total > 0 ? (p.busy / p.total * 100) : 0;
+    const color = AGENT_COLORS[type] || '#6c5ce7';
+    return `<div class="pool-card" onclick="openAgentView('${type}')">
+      <div class="pool-name" style="color:${color}">${type}</div>
+      <div class="pool-bar"><div class="pool-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="pool-meta">${p.busy}/${p.total} busy</div>
+    </div>`;
+  }).join('');
+
+  // Demands
+  const demands = data.demands || [];
+  document.getElementById('demandsList').innerHTML = demands.length === 0
+    ? '<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">No active demands</div>'
+    : demands.map(d => {
+      const prog = d.progress || {};
+      const total = prog.total || 0;
+      const done = prog.done || 0;
+      const pct = total > 0 ? (done / total * 100) : 0;
+      const cost = prog.cost || 0;
+      return `<div class="demand-row" onclick="openDemandView('${d.id}')">
+        <div class="demand-priority p${d.priority}">P${d.priority}</div>
+        <div class="demand-title">${esc(d.title)}</div>
+        <div><div class="demand-progress"><div class="demand-progress-fill" style="width:${pct}%"></div></div></div>
+        <div class="demand-status">${done}/${total}${cost > 0 ? ` $${cost.toFixed(2)}` : ''}</div>
+      </div>`;
+    }).join('');
+
+  // Resources
+  const active = data.resources || [];
+  document.getElementById('activeTasks').innerHTML = active.length > 0
+    ? active.map(t => `<div style="margin-bottom:2px">${esc(t)}</div>`).join('')
+    : '<div style="color:var(--muted)">idle</div>';
+
+  // Stats
+  const s = data.stats || {};
+  document.getElementById('statDemands').textContent = demands.length;
+  document.getElementById('statTasks').textContent = `${s.done || 0}/${s.total_tasks || 0}`;
+  const tok = (s.total_input_tokens || 0) + (s.total_output_tokens || 0);
+  document.getElementById('statTokens').textContent = tok > 1000 ? `${(tok/1000).toFixed(1)}k` : tok;
+  document.getElementById('statCost').textContent = `$${(s.total_cost_usd || 0).toFixed(4)}`;
 }
 
-// --- Task Cards ---
-function badgeClass(agent) { return `badge badge-${agent}`; }
-
-function renderKanban() {
-  Object.values(COLS).forEach(id => document.getElementById(id).innerHTML = '');
-  const counts = { planned: 0, in_progress: 0, done: 0, blocked: 0 };
-
-  Object.values(tasks).sort((a, b) => (b.started_at || '').localeCompare(a.started_at || '')).forEach(t => {
-    const col = COLS[t.status] || COLS.planned;
-    const status = t.status === 'failed' ? 'blocked' : (t.status || 'planned');
-    counts[status] = (counts[status] || 0) + 1;
-
-    const card = document.createElement('div');
-    card.className = `task-card${t.id === selectedTaskId ? ' selected' : ''}`;
-    card.innerHTML = `
-      <div class="task-id">${t.id}</div>
-      <div class="task-meta">
-        <span class="${badgeClass(t.agent)}">${t.agent}</span>
-        ${t.action || ''}
-        ${t.total_cost_usd > 0 ? ` · $${t.total_cost_usd.toFixed(4)}` : ''}
-      </div>
-    `;
-    card.onclick = () => selectTask(t.id);
-    document.getElementById(col).appendChild(card);
-  });
-
-  Object.entries(counts).forEach(([k, v]) => {
-    const el = document.getElementById(`count${k.charAt(0).toUpperCase() + k.slice(1).replace('_p', 'P')}`);
-    if (el) el.textContent = v;
-  });
+// === DEMAND VIEW with D3 ===
+function openDemandView(demandId) {
+  selectedDemandId = demandId;
+  switchView('demand');
 }
 
-// --- Task Detail ---
-async function selectTask(taskId) {
-  selectedTaskId = taskId;
-  renderKanban();
+async function loadDemandGraph(demandId) {
+  const [detailRes, graphRes] = await Promise.all([
+    fetch(`/api/v2/demands/${demandId}`),
+    fetch(`/api/v2/demands/${demandId}/graph`)
+  ]);
+  const detail = await detailRes.json();
+  const graph = await graphRes.json();
 
-  const res = await fetch(`/api/tasks/${taskId}`);
-  const detail = await res.json();
-  if (detail.error) return;
+  document.getElementById('graphTitle').textContent = detail.title || demandId;
 
-  const steps = detail.steps || [];
-  const dc = document.getElementById('detailContent');
-
-  dc.innerHTML = `
-    <div class="detail-header">
-      <div class="task-name">${detail.id}</div>
-      <div class="detail-meta">
-        <span class="${badgeClass(detail.agent)}">${detail.agent}</span>
-        ${detail.action || ''} · ${detail.status}
-        ${detail.total_cost_usd > 0 ? ` · $${detail.total_cost_usd.toFixed(4)}` : ''}
-      </div>
-    </div>
-
-    <div class="phases">
-      <div class="phase ${steps.length > 0 ? 'done' : ''}">classify</div>
-      <div class="phase ${steps.length > 0 ? 'done' : ''}">plan</div>
-      <div class="phase ${detail.status === 'in_progress' ? 'active' : (detail.status === 'done' ? 'done' : '')}">execute</div>
-      <div class="phase">replan</div>
-    </div>
-
-    ${detail.input ? `<div style="font-size:11px;color:var(--muted);margin-bottom:8px;max-height:60px;overflow:auto">${detail.input}</div>` : ''}
-
-    <h2 style="margin-top:12px">Steps (${steps.length})</h2>
-    ${steps.map(s => `
-      <div class="step" onclick="this.querySelector('.step-detail').classList.toggle('open')">
-        <div class="step-header">
-          <span class="step-name">${s.id}</span>
-          <span class="step-status ${s.status}">${s.status}</span>
-        </div>
-        <div class="step-detail">
-          <div>${s.description || ''}</div>
-          ${s.instruction ? `<pre>${escHtml(s.instruction)}</pre>` : ''}
-          ${s.result ? `<pre style="border-left:2px solid var(--green)">${escHtml(s.result)}</pre>` : ''}
-          ${s.error ? `<pre style="border-left:2px solid var(--red)">${escHtml(s.error)}</pre>` : ''}
-          <div class="step-cost">
-            ${s.provider ? `<span>${s.provider}/${s.model}</span>` : ''}
-            ${s.input_tokens ? `<span>${s.input_tokens}+${s.output_tokens} tok</span>` : ''}
-            ${s.cost_usd > 0 ? `<span>$${s.cost_usd.toFixed(4)}</span>` : ''}
-            ${s.latency_ms > 0 ? `<span>${(s.latency_ms/1000).toFixed(1)}s</span>` : ''}
-          </div>
-        </div>
-      </div>
-    `).join('')}
-
-    <div class="activity-log">
-      <h2>Live Activity</h2>
-      <div id="activityFeed"></div>
-    </div>
-
-    ${detail.status === 'in_progress' ? `
-      <button onclick="cancelTask('${detail.id}')" style="margin-top:12px;padding:6px 12px;background:var(--red);color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px">Cancel Task</button>
-    ` : ''}
+  // Sidebar
+  const tasks = detail.tasks || [];
+  const done = tasks.filter(t => t.status === 'done').length;
+  const cost = tasks.reduce((s, t) => s + (t.total_cost_usd || 0), 0);
+  document.getElementById('demandDetail').innerHTML = `
+    <dl class="demand-meta">
+      <dt>Priority</dt><dd>P${detail.priority}</dd>
+      <dt>Status</dt><dd>${detail.status}</dd>
+      <dt>Progress</dt><dd>${done} / ${tasks.length} tasks</dd>
+      <dt>Cost</dt><dd>$${cost.toFixed(4)}</dd>
+      <dt>Created</dt><dd>${(detail.created_at || '').split('T')[0]}</dd>
+    </dl>
+    <h2 style="margin-top:12px">Tasks</h2>
+    ${tasks.map(t => `<div style="font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)">
+      <span style="color:${AGENT_COLORS[t.agent] || '#999'}">${t.agent}</span>
+      <strong>${t.id}</strong>
+      <span style="color:${{done:'var(--green)',in_progress:'var(--yellow)',blocked:'var(--red)'}[t.status] || 'var(--muted)'}">${t.status}</span>
+    </div>`).join('')}
   `;
 
-  loadActivityLog(taskId);
+  renderD3Graph(graph);
 }
 
-function escHtml(s) {
-  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function renderD3Graph(graph) {
+  const container = document.getElementById('graphSvg');
+  container.innerHTML = '';
+  const width = container.clientWidth || 800;
+  const height = container.clientHeight || 500;
+
+  const svg = d3.select(container)
+    .attr('viewBox', [0, 0, width, height]);
+
+  // Arrow marker
+  svg.append('defs').append('marker')
+    .attr('id', 'arrowhead').attr('viewBox', '0 -5 10 10')
+    .attr('refX', 22).attr('refY', 0).attr('markerWidth', 6).attr('markerHeight', 6)
+    .attr('orient', 'auto')
+    .append('path').attr('d', 'M0,-5L10,0L0,5').attr('fill', '#3a3a5a');
+
+  const nodes = graph.nodes || [];
+  const edges = graph.edges || [];
+
+  // Build link references
+  const nodeMap = {};
+  nodes.forEach(n => nodeMap[n.id] = n);
+  const links = edges.filter(e => nodeMap[e.source] && nodeMap[e.target]);
+
+  const simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(100))
+    .force('charge', d3.forceManyBody().strength(-300))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .force('y', d3.forceY(height / 2).strength(0.05));
+
+  const link = svg.append('g').selectAll('line')
+    .data(links).join('line').attr('class', 'link');
+
+  const node = svg.append('g').selectAll('g')
+    .data(nodes).join('g')
+    .attr('class', d => `node node-${d.status}`)
+    .call(d3.drag()
+      .on('start', (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on('end', (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+    );
+
+  node.append('circle')
+    .attr('r', d => 12 + (d.cost || 0) * 50)
+    .attr('fill', d => AGENT_COLORS[d.agent] || '#555')
+    .attr('fill-opacity', 0.15);
+
+  node.append('text')
+    .attr('dy', -16).attr('text-anchor', 'middle')
+    .text(d => d.id);
+
+  node.append('text')
+    .attr('class', 'agent-label')
+    .attr('dy', 24).attr('text-anchor', 'middle')
+    .text(d => d.agent + (d.agent_instance ? ` (${d.agent_instance})` : ''));
+
+  simulation.on('tick', () => {
+    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    node.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
 }
 
-async function cancelTask(taskId) {
-  if (!confirm(`Cancel task ${taskId}?`)) return;
-  await fetch(`/api/tasks/${taskId}/cancel`, { method: 'POST' });
-  loadTasks();
+// === AGENT VIEW ===
+function openAgentView(agentType) {
+  selectedAgentType = agentType;
+  switchView('agent');
 }
 
-// --- Stats ---
-async function loadStats() {
-  const res = await fetch('/api/stats');
-  const s = await res.json();
-  document.getElementById('statTasks').textContent = `${s.done || 0}/${s.total_tasks || 0}`;
-  const totalTok = (s.total_input_tokens || 0) + (s.total_output_tokens || 0);
-  document.getElementById('statTokens').textContent = totalTok > 1000 ? `${(totalTok/1000).toFixed(1)}k` : totalTok;
-  document.getElementById('statCost').textContent = `$${(s.total_cost_usd || 0).toFixed(4)}`;
-  const sec = (s.total_latency_ms || 0) / 1000;
-  document.getElementById('statLatency').textContent = sec > 60 ? `${(sec/60).toFixed(1)}m` : `${sec.toFixed(0)}s`;
+async function loadAgentView(agentType) {
+  const res = await fetch(`/api/v2/agents/${agentType}`);
+  const data = await res.json();
+  const color = AGENT_COLORS[agentType] || '#6c5ce7';
+
+  document.getElementById('agentViewTitle').innerHTML = `<span style="color:${color}">${agentType}</span> Pool`;
+
+  const instances = data.instances || [];
+  document.getElementById('agentInstances').innerHTML = instances.map(i => `
+    <div class="instance-card">
+      <div>
+        <div class="instance-id">${i.id}</div>
+        ${i.current_task_id ? `<div class="instance-task">${i.current_task_id} (${i.current_demand_id || '?'})</div>` : ''}
+        <div style="font-size:10px;color:var(--muted)">${i.total_tasks_completed} tasks completed</div>
+      </div>
+      <span class="instance-status ${i.status}">${i.status}</span>
+    </div>
+  `).join('');
+
+  document.getElementById('agentQueue').innerHTML = data.queue_depth > 0
+    ? `<div style="font-size:11px;color:var(--muted)">${data.queue_depth} tasks waiting</div>`
+    : '<div style="font-size:11px;color:var(--muted)">empty</div>';
 }
 
-// --- Data Loading ---
-async function loadTasks() {
-  const res = await fetch('/api/tasks');
-  const list = await res.json();
-  tasks = {};
-  list.forEach(t => tasks[t.id] = t);
-  renderKanban();
-  updateAgents();
-  loadStats();
-}
-
-// --- SSE ---
+// === SSE ===
 function connectSSE() {
   const es = new EventSource(`/api/events?last_id=${lastEventId}`);
   const dot = document.getElementById('connDot');
@@ -331,60 +412,19 @@ function connectSSE() {
     try {
       const ev = JSON.parse(e.data);
       lastEventId = ev.id || lastEventId;
-
-      if (['task_started','task_done','task_blocked','task_cancelled'].includes(ev.event_type)) {
-        loadTasks();
-        if (selectedTaskId === ev.task_id) selectTask(ev.task_id);
-      } else if (['step_started','step_done','step_failed'].includes(ev.event_type)) {
-        if (selectedTaskId === ev.task_id) selectTask(ev.task_id);
-        loadStats();
-      } else if (ev.event_type === 'dispatch_started' || ev.event_type === 'dispatch_done') {
-        loadTasks();
-      } else if (ev.event_type.startsWith('cli_') && ev.task_id === selectedTaskId) {
-        appendActivity(ev);
-      }
+      if (currentView === 'overview') loadOverview();
+      if (currentView === 'demand' && selectedDemandId) loadDemandGraph(selectedDemandId);
+      if (currentView === 'agent' && selectedAgentType) loadAgentView(selectedAgentType);
     } catch (err) {}
   };
 }
 
-// --- Activity Log ---
-async function loadActivityLog(taskId) {
-  const feed = document.getElementById('activityFeed');
-  if (!feed) return;
-  const res = await fetch(`/api/events?last_id=0`);
-  const events = await res.json();
-  const relevant = events.filter(e => e.task_id === taskId && e.event_type.startsWith('cli_'));
-  feed.innerHTML = relevant.slice(-30).map(e => renderActivity(e)).join('');
-  feed.scrollTop = feed.scrollHeight;
-}
+function esc(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-function renderActivity(ev) {
-  const data = typeof ev.data === 'string' ? JSON.parse(ev.data || '{}') : (ev.data || {});
-  const time = ev.timestamp ? ev.timestamp.split('T')[1]?.split('.')[0] || '' : '';
-  if (ev.event_type === 'cli_tool_call') {
-    return `<div class="activity-item tool_call"><span class="tool-name">${escHtml(data.tool)}</span> ${escHtml(data.input || '')}<span class="timestamp">${time}</span></div>`;
-  }
-  if (ev.event_type === 'cli_assistant_text') {
-    return `<div class="activity-item text">${escHtml(data.text || '')}<span class="timestamp">${time}</span></div>`;
-  }
-  return '';
-}
-
-function appendActivity(ev) {
-  const feed = document.getElementById('activityFeed');
-  if (!feed) return;
-  const html = renderActivity(ev);
-  if (html) {
-    feed.innerHTML += html;
-    feed.scrollTop = feed.scrollHeight;
-  }
-}
-
-// --- Init ---
-initAgents();
-loadTasks();
+// === Init ===
+loadOverview();
 connectSSE();
-setInterval(loadStats, 15000);
+setInterval(() => { if (currentView === 'overview') loadOverview(); }, 10000);
 </script>
 </body>
 </html>
