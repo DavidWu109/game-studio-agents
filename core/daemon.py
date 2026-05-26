@@ -1,159 +1,125 @@
-"""StudioDaemon — top-level coordinator for autonomous agent operation.
+"""StudioDaemon — top-level coordinator with scheduler + dashboard API.
 
-Interface #4: Hierarchical coordination via daemon + message bus.
+Drives the Scheduler in a tick loop and serves the dashboard API.
 
-The daemon is the "Studio Director" runtime. It:
-1. Watches for new dispatch YAML files (PjM output)
-2. Launches dispatch_loop() per file
-3. Processes cross-agent messages (inbox routing)
-4. Checks replan triggers and invokes PjM.replan()
-5. Manages agent lifecycle (tick each agent's loop())
-
-NOT YET IMPLEMENTED. This file defines the interface and contracts.
-
-Usage (when implemented):
-    python3 -m core.daemon                    # foreground
-    python3 -m core.daemon --daemonize        # background
-    python3 -m core.daemon --once             # single tick (for cron)
-
-Dependencies:
-    - core/dispatch.py (dispatch_loop, _check_replan_triggers)
-    - core/agent.py (StudioAgent.loop, .replan, .on_qa_feedback)
-    - core/search.py (agentic_search — for PjM replan context)
+Usage:
+    python3 -m core.daemon                    # foreground (scheduler + API)
+    python3 -m core.daemon --once             # single tick, then exit
+    python3 -m core.daemon --api-only         # dashboard API only, no scheduling
 """
 
 from __future__ import annotations
 
 import logging
+import subprocess
+import threading
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
+
+import yaml
 
 logger = logging.getLogger("daemon")
 
-# Where PjM drops new dispatch YAML files for the daemon to pick up
 DISPATCH_INBOX = Path("~/Projects/gopoo-studio-project/studio/tasks/").expanduser()
-
-# How often the daemon ticks (seconds)
-TICK_INTERVAL = 30
-
-# Agent departments to tick on each round
-ACTIVE_DEPARTMENTS = [
-    "art", "engineering", "qa", "design", "studio", "pjm", "pm",
-    "go-dev", "cd", "marketing",
-]
+PLANS_DIR = Path(__file__).parent.parent / "plans"
+TICK_INTERVAL = 10
 
 
 class StudioDaemon:
-    """Top-level coordinator. Runs as a long-lived process.
 
-    Responsibilities:
-    - Watch DISPATCH_INBOX for new .yaml files with status != all-done
-    - For each active dispatch, run dispatch_loop() in a thread
-    - Route cross-agent messages (check all agent inboxes)
-    - Trigger PjM replan when conditions are met
-    - Call agent.loop() for each department on schedule
-
-    Does NOT:
-    - Make creative decisions (that's the agents' job)
-    - Modify task inputs (that's PjM replan or agent.on_qa_feedback)
-    - Override safety boundaries (that's core/safety.py)
-    """
-
-    def __init__(self, studio_dir: str = "."):
-        self.studio_dir = Path(studio_dir)
-        self._active_dispatches: Dict[Path, "threading.Thread"] = {}
-        self._agents: Dict[str, "StudioAgent"] = {}
+    def __init__(self):
+        from core.scheduler import Scheduler
+        from core.db import init_db
+        init_db()
+        self._scheduler = Scheduler()
+        self._scanned_files: set = set()
 
     def run(self, once: bool = False):
-        """Main daemon loop.
+        logger.info("Daemon started (tick_interval=%ds)", TICK_INTERVAL)
 
-        Args:
-            once: if True, run a single tick and exit (for cron mode)
-        """
-        # TODO: implement
-        # while True:
-        #     self._tick()
-        #     if once:
-        #         break
-        #     time.sleep(TICK_INTERVAL)
-        raise NotImplementedError
+        # Warm MCP session
+        try:
+            subprocess.run(["bash", "/tmp/mcp.sh", "init"],
+                           capture_output=True, timeout=10)
+        except Exception:
+            pass
+
+        while True:
+            try:
+                self._tick()
+            except Exception as e:
+                logger.error("Tick error: %s", e)
+            if once:
+                break
+            time.sleep(TICK_INTERVAL)
 
     def _tick(self):
-        """Single daemon tick. Called every TICK_INTERVAL seconds.
+        self._scan_demands()
+        scheduled = self._scheduler.tick()
+        self._scheduler.cleanup_finished()
+        if scheduled:
+            logger.info("Tick: scheduled %d tasks", scheduled)
 
-        Order of operations:
-        1. Scan for new dispatch YAMLs
-        2. Check active dispatches for replan triggers
-        3. Route pending messages across agent inboxes
-        4. Tick each agent's loop() for background work
-        """
-        # TODO: implement
-        # self._scan_dispatches()
-        # self._check_replans()
-        # self._route_messages()
-        # self._tick_agents()
-        raise NotImplementedError
+    def _scan_demands(self):
+        """Scan for demand YAML files (new format) and legacy dispatch YAML."""
+        for inbox in [DISPATCH_INBOX, PLANS_DIR]:
+            if not inbox.exists():
+                continue
+            for f in inbox.glob("*.yaml"):
+                if f in self._scanned_files:
+                    continue
+                self._scanned_files.add(f)
+                try:
+                    data = yaml.safe_load(f.read_text())
+                except Exception:
+                    continue
+                if not data:
+                    continue
+                if "demand_id" in data:
+                    self._load_demand(f, data)
+                elif "tasks" in data:
+                    self._load_legacy_dispatch(f, data)
 
-    def _scan_dispatches(self):
-        """Find new dispatch YAML files and start dispatch_loop() threads.
+    def _load_demand(self, path: Path, data: dict):
+        demand_id = data["demand_id"]
+        title = data.get("title", demand_id)
+        priority = data.get("priority", 2)
+        dispatch_entries = data.get("dispatches", [])
 
-        Scan DISPATCH_INBOX for .yaml files. For each file not already
-        tracked in _active_dispatches, check if it has pending tasks.
-        If so, start a dispatch_loop() thread.
+        dispatch_paths = []
+        for entry in dispatch_entries:
+            dp = entry.get("path", entry) if isinstance(entry, dict) else entry
+            dp_path = Path(dp)
+            if not dp_path.is_absolute():
+                dp_path = path.parent / dp_path
+            if dp_path.exists():
+                dispatch_paths.append(dp_path)
 
-        Implementation notes:
-            - Use dispatch.load_dispatch() to check task statuses
-            - Skip files where all_done() is True
-            - Track thread per yaml_path in _active_dispatches
-            - Clean up finished threads
-        """
-        raise NotImplementedError
+        if dispatch_paths:
+            self._scheduler.submit_demand(demand_id, title, priority, dispatch_paths)
+            logger.info("Loaded demand: %s (P%d, %d dispatches)", demand_id, priority, len(dispatch_paths))
 
-    def _check_replans(self):
-        """Check replan triggers for all active dispatches.
+    def _load_legacy_dispatch(self, path: Path, data: dict):
+        """Wrap a bare dispatch YAML as a P2 demand."""
+        task_id = data.get("task_id", path.stem)
+        goal = data.get("goal", task_id)
 
-        For each active dispatch, call _check_replan_triggers().
-        If triggered, call _apply_replan().
+        all_done = all(t.get("status") in ("done", "blocked") for t in data.get("tasks", []))
+        if all_done:
+            return
 
-        Implementation notes:
-            - Import from core.dispatch
-            - Only check dispatches that have been running > 5 minutes
-              (avoid premature replanning)
-        """
-        raise NotImplementedError
+        self._scheduler.submit_demand(
+            demand_id=task_id,
+            title=goal,
+            priority=2,
+            dispatch_paths=[path],
+        )
+        logger.info("Loaded legacy dispatch as P2 demand: %s", task_id)
 
-    def _route_messages(self):
-        """Process cross-agent messages from all inboxes.
-
-        For each department, check_inbox(). For messages that need
-        routing (e.g. asset_delivery from Art → Engineering), deliver
-        to the target agent's receive_message().
-
-        Message types and routing:
-            asset_request:      → Art (generate asset)
-            asset_delivery:     → Engineering (integrate asset)
-            build_ready:        → QA (review build)
-            bug_report:         → Engineering (fix bug)
-            quality_gate_result:→ Studio (report) + upstream (retry)
-            wiki_insight:       → target dept (cross-pollinate knowledge)
-            escalation:         → Studio Director (human attention needed)
-            priority_update:    → PjM (replan may be needed)
-        """
-        raise NotImplementedError
-
-    def _tick_agents(self):
-        """Call loop() for each active department agent.
-
-        This is how agents do background work: check their inbox,
-        run curate(), process pending ingest tasks, etc.
-
-        Implementation notes:
-            - Instantiate agents lazily, cache in _agents dict
-            - Catch exceptions per agent (one failing shouldn't stop others)
-            - Log slow agents (>10s per tick)
-        """
-        raise NotImplementedError
+    @property
+    def scheduler(self):
+        return self._scheduler
 
 
 # ---------------------------------------------------------------------------
@@ -162,20 +128,33 @@ class StudioDaemon:
 
 def main():
     import argparse
-    p = argparse.ArgumentParser(description="Studio Director daemon")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
+
+    p = argparse.ArgumentParser(description="Anvil Daemon — scheduler + dashboard")
     p.add_argument("--once", action="store_true", help="Single tick, then exit")
-    p.add_argument("--daemonize", action="store_true", help="Run in background")
-    p.add_argument("--studio-dir", type=str, default=".",
-                   help="Path to game-studio-agents root")
+    p.add_argument("--api-only", action="store_true", help="Dashboard API only, no scheduling")
+    p.add_argument("--port", type=int, default=8420, help="Dashboard API port")
     args = p.parse_args()
 
-    daemon = StudioDaemon(studio_dir=args.studio_dir)
+    daemon = StudioDaemon()
 
-    if args.daemonize:
-        # TODO: implement proper daemonization (or use systemd/launchd)
-        raise NotImplementedError("Daemonize not yet implemented")
+    if args.api_only:
+        _start_api(daemon, args.port)
+        return
+
+    # Start API in background thread
+    api_thread = threading.Thread(target=_start_api, args=(daemon, args.port), daemon=True)
+    api_thread.start()
 
     daemon.run(once=args.once)
+
+
+def _start_api(daemon: StudioDaemon, port: int):
+    import uvicorn
+    from core.api import app
+
+    app.state.scheduler = daemon.scheduler
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
 
 
 if __name__ == "__main__":

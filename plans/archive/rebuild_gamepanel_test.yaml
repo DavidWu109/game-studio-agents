@@ -1,0 +1,48 @@
+task_id: rebuild_gamepanel_test
+goal: '完整重建 GamePanel: 刷新资源 → 重建 prefab → play mode 截图 → 对比 mockup → 飞书报告'
+created: 2026-05-26 19:00:00+08:00
+source: dashboard_test
+tasks:
+- id: refresh_assets
+  agent: engineering
+  action: code
+  provider: cli
+  input: '在 Unity 项目 ~/Projects/go-poo-client 中执行以下操作: 1. 通过 MCP 调用 assets-refresh
+    刷新 AssetDatabase 2. 通过 MCP 调用 console-get-logs 检查是否有编译错误 3. 如果有错误，报告错误内容；如果无错误，报告
+    "Assets refreshed, no errors"
+
+    MCP 调用方式: bash /tmp/mcp.sh call "tool-name" ''{}''
+
+    '
+  status: done
+  started: '2026-05-26T11:55:21.058504+00:00'
+  completed: '2026-05-26T11:55:24.832851+00:00'
+  result: Invalid API key · Fix external API key
+- id: rebuild_prefab
+  agent: engineering
+  action: code
+  provider: cli
+  depends_on:
+  - refresh_assets
+  input: "在 Unity 项目 ~/Projects/go-poo-client 中: 1. 通过 MCP 执行菜单项 \"GoPoo/Build Game\
+    \ Panel\" 重建 GamePanel prefab\n   bash /tmp/mcp.sh call \"gopoo-exec-menu\" '{\"\
+    menuPath\":\"GoPoo/Build Game Panel\"}'\n2. 等待 3 秒让 Unity 处理 3. 通过 MCP 检查 console\
+    \ 日志确认没有错误\n   bash /tmp/mcp.sh call \"console-get-logs\" '{}'\n4. 报告重建结果\n"
+  status: done
+  started: '2026-05-26T11:55:25.706311+00:00'
+  completed: '2026-05-26T11:55:29.250122+00:00'
+  result: Invalid API key · Fix external API key
+- id: qa_screenshot
+  agent: qa
+  action: review
+  provider: cli
+  depends_on:
+  - rebuild_prefab
+  input: "对 GamePanel 进行 QA 截图审查: 1. 通过 MCP 设置游戏状态并截图\n   bash /tmp/mcp.sh call \"\
+    gopoo-game-state\" '{\"state\":\"gameplay\",\"screenshot\":true}'\n2. 读取截图文件 3.\
+    \ 读取设计稿 mockup: ~/Projects/gopoo-studio-project/design/mockups/gamepanel_mockup.png\
+    \ 4. 对比截图和 mockup，列出所有视觉差异 5. 给出 0-100 的匹配分数 6. 输出结构化的 QA 报告\n"
+  status: blocked
+  started: '2026-05-26T11:55:30.212921+00:00'
+  blocked_reason: 'INVALID: QA result missing sections/scores | raw: Invalid API key
+    · Fix external API key'

@@ -145,9 +145,10 @@ class Planner:
 
     def _run_simple(self, task: dict) -> ProviderResult:
         task_input = task.get("input", "")
+        task_id = task.get("id", "")
         safety = build_safety_prompt(self.agent)
         prompt = f"{safety}\n\nTask: {task_input}\n\nReport what you changed concisely."
-        return run_phase("simple", prompt, cwd=self.cwd)
+        return run_phase("simple", prompt, cwd=self.cwd, task_id=task_id)
 
     # --- Phase 1: Complexity Classification ---
 

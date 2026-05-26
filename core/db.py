@@ -81,7 +81,43 @@ CREATE TABLE IF NOT EXISTS events (
     phase      TEXT,
     data       TEXT
 );
+
+CREATE TABLE IF NOT EXISTS demands (
+    id          TEXT PRIMARY KEY,
+    title       TEXT,
+    owner       TEXT,
+    priority    INTEGER DEFAULT 2,
+    deadline    TEXT,
+    status      TEXT DEFAULT 'active',
+    created_at  TEXT,
+    finished_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS demand_dispatches (
+    demand_id   TEXT REFERENCES demands(id),
+    dispatch_id TEXT REFERENCES dispatches(id),
+    seq         INTEGER DEFAULT 0,
+    PRIMARY KEY (demand_id, dispatch_id)
+);
+
+CREATE TABLE IF NOT EXISTS agent_instances (
+    id          TEXT PRIMARY KEY,
+    agent_type  TEXT,
+    status      TEXT DEFAULT 'idle',
+    current_task_id TEXT,
+    current_demand_id TEXT,
+    busy_since  TEXT,
+    total_tasks_completed INTEGER DEFAULT 0
+);
 """
+
+MIGRATIONS = [
+    "ALTER TABLE tasks ADD COLUMN demand_id TEXT",
+    "ALTER TABLE tasks ADD COLUMN agent_instance_id TEXT",
+    "ALTER TABLE tasks ADD COLUMN priority INTEGER DEFAULT 2",
+    "ALTER TABLE tasks ADD COLUMN queued_at TEXT",
+    "ALTER TABLE tasks ADD COLUMN depends_on TEXT",
+]
 
 
 def _now() -> str:
@@ -95,6 +131,11 @@ def init_db() -> sqlite3.Connection:
     _conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
     _conn.row_factory = sqlite3.Row
     _conn.executescript(SCHEMA)
+    for migration in MIGRATIONS:
+        try:
+            _conn.execute(migration)
+        except sqlite3.OperationalError:
+            pass
     _conn.commit()
     logger.info("Dashboard DB initialized at %s", DB_PATH)
     return _conn
@@ -311,3 +352,155 @@ def get_stats() -> dict:
         FROM tasks
     """).fetchone()
     return dict(row) if row else {}
+
+
+# ---------------------------------------------------------------------------
+# Demand CRUD (v2)
+# ---------------------------------------------------------------------------
+
+def record_demand(demand_id: str, title: str, owner: str = "",
+                  priority: int = 2, deadline: Optional[str] = None):
+    try:
+        conn = _get_conn()
+        with _lock:
+            conn.execute(
+                "INSERT OR REPLACE INTO demands (id, title, owner, priority, deadline, status, created_at) VALUES (?, ?, ?, ?, ?, 'active', ?)",
+                (demand_id, title, owner, priority, deadline, _now()))
+            conn.commit()
+        emit_event("demand_created", data={"demand_id": demand_id, "title": title, "priority": priority})
+    except Exception as e:
+        logger.debug("record_demand failed: %s", e)
+
+
+def link_demand_dispatch(demand_id: str, dispatch_id: str, seq: int = 0):
+    try:
+        conn = _get_conn()
+        with _lock:
+            conn.execute(
+                "INSERT OR REPLACE INTO demand_dispatches (demand_id, dispatch_id, seq) VALUES (?, ?, ?)",
+                (demand_id, dispatch_id, seq))
+            conn.commit()
+    except Exception as e:
+        logger.debug("link_demand_dispatch failed: %s", e)
+
+
+def get_demands(status: Optional[str] = None) -> list[dict]:
+    conn = _get_conn()
+    if status:
+        rows = conn.execute(
+            "SELECT * FROM demands WHERE status=? ORDER BY priority, created_at", (status,)).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM demands ORDER BY priority, created_at").fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        progress = conn.execute("""
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN t.status='done' THEN 1 ELSE 0 END) as done,
+                SUM(CASE WHEN t.status='in_progress' THEN 1 ELSE 0 END) as in_progress,
+                SUM(CASE WHEN t.status IN ('blocked','failed') THEN 1 ELSE 0 END) as failed,
+                SUM(t.total_cost_usd) as cost
+            FROM tasks t
+            JOIN demand_dispatches dd ON t.dispatch_id = dd.dispatch_id
+            WHERE dd.demand_id = ?
+        """, (d["id"],)).fetchone()
+        d["progress"] = dict(progress) if progress else {}
+        result.append(d)
+    return result
+
+
+def get_demand_detail(demand_id: str) -> Optional[dict]:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM demands WHERE id=?", (demand_id,)).fetchone()
+    if not row:
+        return None
+    demand = dict(row)
+    dispatches = conn.execute(
+        "SELECT d.* FROM dispatches d JOIN demand_dispatches dd ON d.id = dd.dispatch_id WHERE dd.demand_id=? ORDER BY dd.seq",
+        (demand_id,)).fetchall()
+    demand["dispatches"] = [dict(d) for d in dispatches]
+    tasks = conn.execute("""
+        SELECT t.* FROM tasks t
+        JOIN demand_dispatches dd ON t.dispatch_id = dd.dispatch_id
+        WHERE dd.demand_id = ?
+        ORDER BY t.started_at NULLS LAST
+    """, (demand_id,)).fetchall()
+    demand["tasks"] = [dict(t) for t in tasks]
+    return demand
+
+
+def finish_demand(demand_id: str, status: str = "done"):
+    try:
+        conn = _get_conn()
+        with _lock:
+            conn.execute(
+                "UPDATE demands SET status=?, finished_at=? WHERE id=?",
+                (status, _now(), demand_id))
+            conn.commit()
+        emit_event("demand_done", data={"demand_id": demand_id, "status": status})
+    except Exception as e:
+        logger.debug("finish_demand failed: %s", e)
+
+
+# ---------------------------------------------------------------------------
+# Agent instance CRUD (v2)
+# ---------------------------------------------------------------------------
+
+def record_agent_instance(instance_id: str, agent_type: str):
+    try:
+        conn = _get_conn()
+        with _lock:
+            conn.execute(
+                "INSERT OR IGNORE INTO agent_instances (id, agent_type, status) VALUES (?, ?, 'idle')",
+                (instance_id, agent_type))
+            conn.commit()
+    except Exception as e:
+        logger.debug("record_agent_instance failed: %s", e)
+
+
+def update_agent_instance(instance_id: str, status: str,
+                          current_task_id: Optional[str] = None,
+                          current_demand_id: Optional[str] = None):
+    try:
+        conn = _get_conn()
+        with _lock:
+            if status == "busy":
+                conn.execute(
+                    "UPDATE agent_instances SET status=?, current_task_id=?, current_demand_id=?, busy_since=? WHERE id=?",
+                    (status, current_task_id, current_demand_id, _now(), instance_id))
+            elif status == "idle":
+                conn.execute("""
+                    UPDATE agent_instances SET status='idle', current_task_id=NULL,
+                    current_demand_id=NULL, busy_since=NULL,
+                    total_tasks_completed = total_tasks_completed + 1
+                    WHERE id=?""", (instance_id,))
+            else:
+                conn.execute("UPDATE agent_instances SET status=? WHERE id=?", (status, instance_id))
+            conn.commit()
+    except Exception as e:
+        logger.debug("update_agent_instance failed: %s", e)
+
+
+def get_agent_instances(agent_type: Optional[str] = None) -> list[dict]:
+    conn = _get_conn()
+    if agent_type:
+        rows = conn.execute(
+            "SELECT * FROM agent_instances WHERE agent_type=? ORDER BY id", (agent_type,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM agent_instances ORDER BY agent_type, id").fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_pool_utilization() -> dict:
+    conn = _get_conn()
+    rows = conn.execute("""
+        SELECT agent_type,
+            COUNT(*) as total,
+            SUM(CASE WHEN status='busy' THEN 1 ELSE 0 END) as busy,
+            SUM(CASE WHEN status='idle' THEN 1 ELSE 0 END) as idle
+        FROM agent_instances
+        GROUP BY agent_type
+    """).fetchall()
+    return {r["agent_type"]: {"total": r["total"], "busy": r["busy"], "idle": r["idle"]} for r in rows}

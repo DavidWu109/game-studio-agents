@@ -60,6 +60,20 @@ tier_routing:
   art.generate: deepseek
   studio.report: cli
 
+# Agent pool sizes (v2 scheduler)
+agent_pools:
+  engineering: 3
+  art: 2
+  design: 2
+  qa: 2
+  studio: 1
+  go-dev: 1
+
+# Shared resource concurrency limits
+resources:
+  comfyui: 1
+  unity_mcp: 1
+
 # Cost per million tokens (USD)
 pricing:
   deepseek:

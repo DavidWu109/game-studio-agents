@@ -272,10 +272,11 @@ def _gather_knowledge(dept: str) -> str:
 # ---------------------------------------------------------------------------
 
 class ResourceManager:
-    def __init__(self):
-        self._locks: Dict[str, threading.Lock] = {
-            "comfyui": threading.Lock(),
-            "unity_mcp": threading.Lock(),
+    def __init__(self, config: Optional[Dict[str, int]] = None):
+        resource_config = config or {"comfyui": 1, "unity_mcp": 1}
+        self._semaphores: Dict[str, threading.Semaphore] = {
+            name: threading.Semaphore(count)
+            for name, count in resource_config.items()
         }
         self._resource_map = {
             ("art", "iterate"): "comfyui",
@@ -288,12 +289,20 @@ class ResourceManager:
         resource = self._resource_map.get((agent, action))
         if resource is None:
             return True
-        return self._locks[resource].acquire(blocking=False)
+        sem = self._semaphores.get(resource)
+        if sem is None:
+            return True
+        return sem.acquire(blocking=False)
 
     def release(self, agent: str, action: str):
         resource = self._resource_map.get((agent, action))
-        if resource and self._locks[resource].locked():
-            self._locks[resource].release()
+        if resource:
+            sem = self._semaphores.get(resource)
+            if sem:
+                sem.release()
+
+    def get_resource(self, agent: str, action: str) -> Optional[str]:
+        return self._resource_map.get((agent, action))
 
 
 # ---------------------------------------------------------------------------
@@ -356,7 +365,7 @@ def notify(agent: str, message: str):
         logger.warning("Feishu notify failed: %s", e)
 
 
-def _run_task(task: dict, yaml_path: Path, resources: ResourceManager) -> tuple[str, str]:
+def run_task(task: dict, yaml_path: Path, resources: ResourceManager) -> tuple[str, str]:
     """Execute a single task. Returns (task_id, result_or_error)."""
     agent, action = task["agent"], task["action"]
     task_id = task["id"]
@@ -455,6 +464,13 @@ def dispatch_loop(yaml_path: Path, poll_interval: int = 15, dry_run: bool = Fals
     if reset_count:
         notify("Studio", f"🔄 恢复: 重置了 {reset_count} 个上次崩溃遗留的 in_progress 任务")
 
+    # Ensure MCP session is warm before dispatching
+    try:
+        subprocess.run(["bash", "/tmp/mcp.sh", "init"],
+                       capture_output=True, timeout=10)
+    except Exception:
+        pass
+
     data = load_dispatch(yaml_path)
     goal = data.get("goal", "unknown")
     total = len(data["tasks"])
@@ -509,7 +525,7 @@ def dispatch_loop(yaml_path: Path, poll_interval: int = 15, dry_run: bool = Fals
 
         futures = {}
         for task in ready:
-            future = executor.submit(_run_task, task, yaml_path, resources)
+            future = executor.submit(run_task, task, yaml_path, resources)
             futures[future] = task
 
         for future in as_completed(futures):

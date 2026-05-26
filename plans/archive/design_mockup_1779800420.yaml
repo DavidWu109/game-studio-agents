@@ -1,0 +1,141 @@
+task_id: design_mockup
+goal: 'Run the GamePanel mockup builder with fixes:
+
+  1. Reduce dim overlay from 45% to 25% (let table texture show)
+
+  2. Enlarge opponent avatars to ≥100px
+
+  3. Tighten hand card fan (less spacing, slight overlap'
+complexity: complex
+replan_count: 1
+created_at: '2026-05-26T13:00:20.634143+00:00'
+completed_at: ''
+knowledge_sources:
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-25.md
+- /Users/davidagent/Projects/game-studio-agents/base/design/wiki/pages/layout-spec-bridge.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-26.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-24.md
+- /Users/davidagent/Projects/gopoo-studio-project/engineering/wiki/pages/gamepanel-review-log.md
+steps:
+- id: '1'
+  description: Inspect current build_gamepanel_mockup.py script
+  instruction: Use read_file on ~/Projects/gopoo-studio-project/design/mockups/build_gamepanel_mockup.py
+    to view current implementation, paying attention to dim overlay alpha, opponent
+    avatar sizes, hand card spacing, toilet size, and text label rendering.
+  expected_outcome: Full script contents visible; identify exact lines/variables for
+    overlay alpha (~0.45 or 115/255), avatar size, card spacing, toilet size, and
+    label drawing.
+  verify_command: test -f ~/Projects/gopoo-studio-project/design/mockups/build_gamepanel_mockup.py
+    && echo OK
+  status: done
+  result: Invalid API key · Fix external API key
+  error: ''
+  retry_count: 0
+- id: '2'
+  description: Locate UI mockup SKILL file
+  instruction: Run `ls ~/Projects/base/design/skills/ui-mockup/ 2>/dev/null && find
+    ~/Projects/base/design/skills -name "SKILL.md" 2>/dev/null` to find the actual
+    path of the SKILL.md file, since the previous read failed (likely wrong path).
+  expected_outcome: ''
+  verify_command: null
+  status: in_progress
+  result: ''
+  error: ''
+  retry_count: 0
+- id: 2b
+  description: Read UI mockup SKILL self-review checklist
+  instruction: Once the correct path is found in step 2, use read_file on that path
+    to load the self-review checklist. If no SKILL.md exists under design/skills/ui-mockup/,
+    search broader with `find ~/Projects/base -name "SKILL.md" -path "*ui*"` and read
+    the closest match.
+  expected_outcome: ''
+  verify_command: null
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '3'
+  description: Reduce dim overlay from 45% to 25%
+  instruction: Edit gopoo-studio-project/design/mockups/build_gamepanel_mockup.py
+    to change the dim overlay alpha from ~45% (≈115/255) to 25% (≈64/255). Search
+    for the overlay/dim drawing code and update the alpha value.
+  expected_outcome: ''
+  verify_command: null
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '4'
+  description: Enlarge opponent avatars to ≥100px
+  instruction: In build_gamepanel_mockup.py, find the opponent avatar size constant/variable
+    and increase it to at least 100px (use 110px for safety margin). Update any related
+    frame/border sizing.
+  expected_outcome: ''
+  verify_command: null
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '5'
+  description: Tighten hand card fan (less spacing, slight overlap)
+  instruction: In build_gamepanel_mockup.py, locate the hand card layout code and
+    reduce the per-card x-spacing so adjacent cards slightly overlap (e.g., spacing
+    = card_width * 0.6 instead of full width + gap).
+  expected_outcome: ''
+  verify_command: null
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '6'
+  description: Enlarge toilet visual anchor to 250px+
+  instruction: In build_gamepanel_mockup.py, find the toilet image/icon size and set
+    it to 260px (≥250px). Recenter as needed.
+  expected_outcome: ''
+  verify_command: null
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '7'
+  description: Add dark pill backgrounds behind all text labels
+  instruction: In build_gamepanel_mockup.py, add a helper (or extend existing draw_text_centered)
+    to draw a rounded dark pill (RGBA black ~180 alpha) behind each text label with
+    small padding. Apply to all text labels (player names, scores, state labels, etc.).
+  expected_outcome: ''
+  verify_command: null
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '8'
+  description: Run the mockup builder
+  instruction: Execute `cd ~/Projects/gopoo-studio-project && python design/mockups/build_gamepanel_mockup.py`
+    and capture stdout/stderr to confirm successful render.
+  expected_outcome: ''
+  verify_command: null
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '9'
+  description: Verify output image dimensions and freshness
+  instruction: Run `ls -la gopoo-studio-project/design/mockups/gamepanel_mockup.png`
+    and use Python/PIL to confirm the image was modified within the last minute and
+    has expected dimensions.
+  expected_outcome: ''
+  verify_command: null
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '10'
+  description: Apply SKILL.md self-review checklist
+  instruction: Using the checklist loaded in step 2b, evaluate the rendered gamepanel_mockup.png
+    against each item. Report pass/fail per item and note any remaining issues.
+  expected_outcome: ''
+  verify_command: null
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
