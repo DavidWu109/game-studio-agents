@@ -176,7 +176,12 @@ def run_sdk(prompt: str, system: str = "",
         else:
             max_tokens = 4096
 
-    client = anthropic.Anthropic(api_key=api_key)
+    cfg = _load_config()
+    base_url = cfg.get("providers", {}).get("sdk", {}).get("base_url")
+    client_kwargs: dict[str, Any] = {"api_key": api_key}
+    if base_url:
+        client_kwargs["base_url"] = base_url
+    client = anthropic.Anthropic(**client_kwargs)
 
     t0 = time.time()
     try:
