@@ -501,7 +501,8 @@ class Planner:
 - Be surgical: one edit_file call per change, using exact strings from the file above.
 - Report what you changed concisely."""
 
-        result = run_phase("execute", prompt, cwd=self.cwd)
+        result = run_phase("execute", prompt, cwd=self.cwd,
+                           task_id=plan.task_id, step_id=step.id)
 
         if result.text.startswith("ERROR:"):
             return False, result.text, result

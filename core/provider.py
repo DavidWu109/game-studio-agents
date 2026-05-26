@@ -236,49 +236,102 @@ def _get_cli_timeout() -> int:
 
 
 def run_cli(prompt: str, cwd: Optional[str] = None,
-            timeout: Optional[int] = None) -> ProviderResult:
+            timeout: Optional[int] = None,
+            task_id: Optional[str] = None,
+            step_id: Optional[str] = None) -> ProviderResult:
     cwd = cwd or str(GOPOO_CLIENT)
     timeout = timeout or _get_cli_timeout()
     cli_flags = _get_cli_flags()
 
     t0 = time.time()
     try:
-        result = subprocess.run(
-            cli_flags + [prompt, "--output-format", "json"],
-            capture_output=True, text=True, timeout=timeout,
-            cwd=cwd)
-    except subprocess.TimeoutExpired:
-        return ProviderResult(text="ERROR: CLI timeout",
-                              provider="cli", model="opus")
+        proc = subprocess.Popen(
+            cli_flags + [prompt, "--output-format", "stream-json", "--verbose"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, cwd=cwd)
     except FileNotFoundError:
         return ProviderResult(text="ERROR: claude CLI not found",
                               provider="cli", model="opus")
 
-    latency = int((time.time() - t0) * 1000)
-
-    if result.returncode != 0:
-        return ProviderResult(
-            text=f"ERROR: claude exit {result.returncode}: {result.stderr[:300]}",
-            provider="cli", model="opus", latency_ms=latency)
+    result_text = ""
+    in_tok, out_tok = 0, 0
+    cost_usd = 0.0
+    model = "opus"
+    tool_calls = []
 
     try:
-        wrapper = json.loads(result.stdout)
-        text = wrapper.get("result", "")
-        in_tok = wrapper.get("usage", {}).get("input_tokens", 0)
-        out_tok = wrapper.get("usage", {}).get("output_tokens", 0)
-    except json.JSONDecodeError:
-        text = result.stdout[:2000]
-        in_tok, out_tok = 0, 0
+        for line in proc.stdout:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                ev = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            ev_type = ev.get("type", "")
+
+            if ev_type == "assistant":
+                msg = ev.get("message", {})
+                for block in msg.get("content", []):
+                    if block.get("type") == "tool_use":
+                        tool_info = {"tool": block.get("name", ""), "input": _summarize_tool_input(block.get("input", {}))}
+                        tool_calls.append(tool_info)
+                        _emit_cli_event("tool_call", task_id, step_id, tool_info)
+                    elif block.get("type") == "text" and block.get("text"):
+                        _emit_cli_event("assistant_text", task_id, step_id, {"text": block["text"][:300]})
+
+            elif ev_type == "result":
+                result_text = ev.get("result", "")
+                usage = ev.get("usage", {})
+                in_tok = usage.get("input_tokens", 0) + usage.get("cache_read_input_tokens", 0) + usage.get("cache_creation_input_tokens", 0)
+                out_tok = usage.get("output_tokens", 0)
+                cost_usd = ev.get("total_cost_usd", 0.0)
+
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        return ProviderResult(text="ERROR: CLI timeout",
+                              provider="cli", model=model)
+
+    latency = int((time.time() - t0) * 1000)
+
+    if proc.returncode != 0 and not result_text:
+        stderr = proc.stderr.read() if proc.stderr else ""
+        return ProviderResult(
+            text=f"ERROR: claude exit {proc.returncode}: {stderr[:300]}",
+            provider="cli", model=model, latency_ms=latency)
 
     return ProviderResult(
-        text=text,
+        text=result_text,
         provider="cli",
-        model="opus",
+        model=model,
         input_tokens=in_tok,
         output_tokens=out_tok,
-        cost_usd=0.0,
+        cost_usd=cost_usd,
         latency_ms=latency,
     )
+
+
+def _summarize_tool_input(inp: Any) -> str:
+    if isinstance(inp, dict):
+        if "command" in inp:
+            return inp["command"][:150]
+        if "file_path" in inp:
+            return inp["file_path"]
+        if "query" in inp:
+            return inp["query"][:150]
+    return str(inp)[:100]
+
+
+def _emit_cli_event(event_type: str, task_id: Optional[str],
+                    step_id: Optional[str], data: dict):
+    try:
+        from core.db import emit_event
+        emit_event(f"cli_{event_type}", task_id=task_id, step_id=step_id,
+                   phase="execute", data=data)
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -371,7 +424,9 @@ def run_deepseek(prompt: str, system: str = "", model: Optional[str] = None,
 # ---------------------------------------------------------------------------
 
 def run_phase(phase: str, prompt: str, system: str = "",
-              cwd: Optional[str] = None) -> ProviderResult:
+              cwd: Optional[str] = None,
+              task_id: Optional[str] = None,
+              step_id: Optional[str] = None) -> ProviderResult:
     """Route a prompt to the correct provider based on pipeline phase config."""
     pc = get_phase_config(phase)
     provider = pc.get("provider", "cli")
@@ -382,7 +437,7 @@ def run_phase(phase: str, prompt: str, system: str = "",
         result = run_sdk(prompt, system=system, model_key=model_key,
                          max_tokens=max_tokens, phase=phase)
     elif provider == "cli":
-        result = run_cli(prompt, cwd=cwd)
+        result = run_cli(prompt, cwd=cwd, task_id=task_id, step_id=step_id)
     elif provider == "deepseek":
         result = run_deepseek(prompt, system=system, max_tokens=max_tokens)
     else:

@@ -82,6 +82,15 @@ body { font-family: -apple-system, 'SF Pro', system-ui, sans-serif; background: 
 .step-detail pre { background: var(--surface); padding: 6px; border-radius: 4px; margin-top: 4px; overflow-x: auto; white-space: pre-wrap; font-size: 10px; }
 .step-cost { display: flex; gap: 8px; margin-top: 4px; font-size: 10px; color: var(--muted); }
 
+/* Activity log */
+.activity-log { margin-top: 12px; }
+.activity-log h2 { margin-bottom: 6px; }
+.activity-item { padding: 4px 8px; font-size: 11px; border-left: 2px solid var(--border); margin-bottom: 2px; color: var(--muted); }
+.activity-item.tool_call { border-left-color: var(--accent); }
+.activity-item.text { border-left-color: var(--blue); }
+.activity-item .tool-name { color: var(--accent); font-weight: 600; }
+.activity-item .timestamp { color: var(--border); font-size: 9px; margin-left: 4px; }
+
 /* Bottom: Stats */
 .stats-bar { display: flex; gap: 20px; padding: 8px 20px; border-top: 1px solid var(--border); background: var(--surface); font-size: 11px; }
 .stat { display: flex; align-items: center; gap: 4px; }
@@ -262,10 +271,17 @@ async function selectTask(taskId) {
       </div>
     `).join('')}
 
+    <div class="activity-log">
+      <h2>Live Activity</h2>
+      <div id="activityFeed"></div>
+    </div>
+
     ${detail.status === 'in_progress' ? `
       <button onclick="cancelTask('${detail.id}')" style="margin-top:12px;padding:6px 12px;background:var(--red);color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px">Cancel Task</button>
     ` : ''}
   `;
+
+  loadActivityLog(taskId);
 }
 
 function escHtml(s) {
@@ -324,9 +340,44 @@ function connectSSE() {
         loadStats();
       } else if (ev.event_type === 'dispatch_started' || ev.event_type === 'dispatch_done') {
         loadTasks();
+      } else if (ev.event_type.startsWith('cli_') && ev.task_id === selectedTaskId) {
+        appendActivity(ev);
       }
     } catch (err) {}
   };
+}
+
+// --- Activity Log ---
+async function loadActivityLog(taskId) {
+  const feed = document.getElementById('activityFeed');
+  if (!feed) return;
+  const res = await fetch(`/api/events?last_id=0`);
+  const events = await res.json();
+  const relevant = events.filter(e => e.task_id === taskId && e.event_type.startsWith('cli_'));
+  feed.innerHTML = relevant.slice(-30).map(e => renderActivity(e)).join('');
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function renderActivity(ev) {
+  const data = typeof ev.data === 'string' ? JSON.parse(ev.data || '{}') : (ev.data || {});
+  const time = ev.timestamp ? ev.timestamp.split('T')[1]?.split('.')[0] || '' : '';
+  if (ev.event_type === 'cli_tool_call') {
+    return `<div class="activity-item tool_call"><span class="tool-name">${escHtml(data.tool)}</span> ${escHtml(data.input || '')}<span class="timestamp">${time}</span></div>`;
+  }
+  if (ev.event_type === 'cli_assistant_text') {
+    return `<div class="activity-item text">${escHtml(data.text || '')}<span class="timestamp">${time}</span></div>`;
+  }
+  return '';
+}
+
+function appendActivity(ev) {
+  const feed = document.getElementById('activityFeed');
+  if (!feed) return;
+  const html = renderActivity(ev);
+  if (html) {
+    feed.innerHTML += html;
+    feed.scrollTop = feed.scrollHeight;
+  }
 }
 
 // --- Init ---
