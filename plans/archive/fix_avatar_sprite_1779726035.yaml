@@ -1,0 +1,72 @@
+task_id: fix_avatar_sprite
+goal: 'In Assets/Editor/GamePanelBuilder.cs, verify ALL avatar sprite paths.
+
+
+  TrySetSprite(img, path) prepends "Assets/" making fullPath = "Assets/{path}.png"
+
+
+  For avatar to load correctly, the path passed t'
+complexity: complex
+replan_count: 2
+created_at: '2026-05-25T16:20:35.335372+00:00'
+completed_at: ''
+knowledge_sources:
+- /Users/davidagent/Projects/game-studio-agents/base/engineering/wiki/pages/sprite-path-gotcha.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-25.md
+- /Users/davidagent/Projects/gopoo-studio-project/engineering/wiki/pages/gamepanel-review-log.md
+- /Users/davidagent/Projects/game-studio-agents/base/qa/wiki/pages/page-review-checklist.md
+- /Users/davidagent/Projects/game-studio-agents/base/engineering/wiki/pages/unity-gotchas.md
+steps:
+- id: 2_check_avatar_paths_revised
+  description: Read Assets/Editor/GamePanelBuilder.cs in smaller chunks (30 lines
+    each) to find all TrySetSprite calls containing 'avatar'. Use read_file with line
+    numbers and stop after finding all avatar-related calls.
+  instruction: 'Use read_file to read Assets/Editor/GamePanelBuilder.cs in chunks
+    of 30 lines.
+
+    Start with lines 1-30, then 31-60, then 61-90, etc.
+
+    For each TrySetSprite call containing ''avatar'', record the line number and the
+    path argument.
+
+    Stop reading once you''ve found all avatar-related calls (typically 2-3 call'
+  expected_outcome: ''
+  verify_command: null
+  status: in_progress
+  result: ''
+  error: ''
+  retry_count: 0
+- id: 3_fix_incorrect_avatar_paths
+  description: Replace any avatar paths that don't match 'Resources/Cards/avatar_poo_01'
+    or 'Resources/Cards/avatar_frame' with the correct paths.
+  instruction: 'For each avatar-related TrySetSprite call found in step 2:
+
+    - If the path is NOT ''Resources/Cards/avatar_poo_01'' and NOT ''Resources/Cards/avatar_frame'',
+    replace it with the correct path.
+
+    - Use edit_file to make the replacement, specifying exact line numbers.
+
+    - Verify the fix by reading the modified l'
+  expected_outcome: ''
+  verify_command: null
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: 4_verify_no_incorrect_paths_remain
+  description: Final verification that all avatar paths in GamePanelBuilder.cs are
+    correct.
+  instruction: 'Use grep or search to find all remaining TrySetSprite calls in Assets/Editor/GamePanelBuilder.cs.
+
+    For each call containing ''avatar'', verify the path is either ''Resources/Cards/avatar_poo_01''
+    or ''Resources/Cards/avatar_frame''.
+
+    If any incorrect paths remain, fix them and re-verify.
+
+    '
+  expected_outcome: ''
+  verify_command: null
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0

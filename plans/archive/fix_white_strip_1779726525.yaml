@@ -1,0 +1,133 @@
+task_id: fix_white_strip
+goal: 'In Assets/Editor/GamePanelBuilder.cs, check line ~186-194 for the root setup.
+
+
+  The root GameObject "GamePanel" should have an Image component with Color.black
+
+  directly on it (NOT on a child "Backdrop"'
+complexity: complex
+replan_count: 1
+created_at: '2026-05-25T16:28:45.524644+00:00'
+completed_at: '2026-05-25T16:30:23.186793+00:00'
+knowledge_sources:
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-25.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/agent-coding-guidelines.md
+- /Users/davidagent/Projects/gopoo-studio-project/design/wiki/pages/gamepanel-mockup-review.md
+- /Users/davidagent/Projects/gopoo-studio-project/engineering/wiki/pages/gamepanel-review-log.md
+- /Users/davidagent/Projects/game-studio-agents/base/design/wiki/pages/layout-spec-bridge.md
+steps:
+- id: '1_1'
+  description: Check current root setup in GamePanelBuilder.cs around line 186-194
+  instruction: Read lines 180-200 of Assets/Editor/GamePanelBuilder.cs to see the
+    current root GameObject setup.
+  expected_outcome: See the code block that creates the root GameObject 'GamePanel'
+    and any Image component or Backdrop child.
+  verify_command: sed -n '180,200p' Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: 'Here are lines 180–200 of `GamePanelBuilder.cs`:
+
+
+    ```csharp
+
+    // Line 183-191: Root GameObject setup
+
+    var root = new GameObject("GamePanel");
+
+    Stretch(root.AddComponent<RectTransform>());
+
+
+    // Root itself '
+  error: ''
+  retry_count: 0
+- id: '1_2'
+  description: Grep for rootImg, Backdrop, and Color.black in the file
+  instruction: Run grep to find all occurrences of rootImg, Backdrop, and Color.black
+    in Assets/Editor/GamePanelBuilder.cs.
+  expected_outcome: See lines showing rootImg assignment, Backdrop creation, or Color.black
+    usage.
+  verify_command: grep -n 'rootImg\|Backdrop\|Color.black' Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: 'Here are the results:
+
+
+    | Line | Match |
+
+    |------|-------|
+
+    | **190** | `var rootImg = root.AddComponent<Image>();` — `rootImg` variable assignment
+    |
+
+    | **191** | `rootImg.color = Color.black;` — `Color.b'
+  error: ''
+  retry_count: 0
+- id: '1_3'
+  description: Confirm root has Image component with Color.black (if already correct)
+  instruction: If the grep output shows 'rootImg = root.AddComponent<Image>()' followed
+    by 'rootImg.color = Color.black' on the root GameObject, no changes are needed.
+    Proceed to verify.
+  expected_outcome: The root GameObject 'GamePanel' has an Image component with Color.black
+    directly on it.
+  verify_command: grep -n 'rootImg = root.AddComponent<Image>()' Assets/Editor/GamePanelBuilder.cs
+    && grep -n 'rootImg.color = Color.black' Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: 'The verification confirms everything is in place:
+
+
+    | Line | Content |
+
+    |------|---------|
+
+    | **186** | `var root = new GameObject("GamePanel");` — root created |
+
+    | **190** | `var rootImg = root.AddCompo'
+  error: ''
+  retry_count: 0
+- id: '1_4'
+  description: If root lacks Image component, add it with Color.black
+  instruction: If the root GameObject does not have an Image component, edit Assets/Editor/GamePanelBuilder.cs
+    to add 'var rootImg = root.AddComponent<Image>();' and 'rootImg.color = Color.black;'
+    after the root GameObject is created (around line 186).
+  expected_outcome: The root GameObject now has an Image component with Color.black.
+  verify_command: grep -n 'rootImg = root.AddComponent<Image>()' Assets/Editor/GamePanelBuilder.cs
+    && grep -n 'rootImg.color = Color.black' Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: 'The root GameObject **already has** an Image component with `Color.black`.
+    Looking at lines 189–192:
+
+
+    ```csharp
+
+    // Root itself is black — catches any gaps from SafeArea shrinking children
+
+    var rootImg '
+  error: ''
+  retry_count: 0
+- id: 1_5_revised
+  description: Verify Backdrop child is redundant - check if it exists and confirm
+    no action needed
+  instruction: 'Search for any Backdrop child GameObject in the hierarchy:
+
+    grep -n "Backdrop" Assets/Editor/GamePanelBuilder.cs
+
+
+    If Backdrop exists:
+
+    - Note it is redundant since root already has Image with Color.black
+
+    - Confirm it can be left as-is (no removal needed)
+
+    - Verify it doesn''t interfere with root''s full-'
+  expected_outcome: Backdrop child confirmed as redundant (exists) OR confirmed absent
+    (clean setup). Either is acceptable.
+  verify_command: null
+  status: done
+  result: '## Result: Clean Setup — No Backdrop Child
+
+
+    `grep -n "Backdrop"` returned **zero matches** across the entire `GamePanelBuilder.cs`.
+    No `Backdrop` child GameObject exists in the hierarchy.
+
+
+    ### Conclus'
+  error: ''
+  retry_count: 0

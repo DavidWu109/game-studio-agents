@@ -1,0 +1,124 @@
+task_id: create_debug_builder
+goal: 'Create a NEW file Assets/Editor/DebugDemoBuilder.cs with 3 independent
+
+  [MenuItem] methods that each build a minimal test panel.
+
+
+  Use BuilderHelper (MakeChild, CreateText, TrySetSprite, Stretch, Create'
+complexity: complex
+replan_count: 0
+created_at: '2026-05-25T18:02:24.848744+00:00'
+completed_at: '2026-05-25T18:03:35.713907+00:00'
+knowledge_sources:
+- /Users/davidagent/Projects/gopoo-studio-project/engineering/wiki/pages/asset-paths.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-24.md
+- /Users/davidagent/Projects/game-studio-agents/base/engineering/wiki/pages/sprite-path-gotcha.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-25.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-26.md
+steps:
+- id: '1'
+  description: Create the base file Assets/Editor/DebugDemoBuilder.cs with necessary
+    using directives, namespace, and empty class
+  instruction: Write a new C# script at Assets/Editor/DebugDemoBuilder.cs. Include
+    using UnityEngine, UnityEngine.UI, UnityEditor, System. Use namespace GoPoo.Editor.
+    Define public class DebugDemoBuilder. Do not reference Coffee.UIEffects. The file
+    should contain only the skeleton, ready for method insertion.
+  expected_outcome: File exists with correct namespace, class, and no compilation
+    errors related to missing references.
+  verify_command: grep -q 'namespace GoPoo.Editor' Assets/Editor/DebugDemoBuilder.cs
+    && grep -q 'class DebugDemoBuilder' Assets/Editor/DebugDemoBuilder.cs
+  status: done
+  result: '**Created** `Assets/Editor/DebugDemoBuilder.cs` with:
+
+
+    - `using UnityEngine;`
+
+    - `using UnityEngine.UI;`
+
+    - `using UnityEditor;`
+
+    - `using System;`
+
+    - `namespace GoPoo.Editor`
+
+    - `public class DebugDemoBui'
+  error: ''
+  retry_count: 0
+- id: '2'
+  description: Implement the WhiteStripDemo [MenuItem] method following the specification
+    exactly
+  instruction: 'Append the following method to the DebugDemoBuilder class: [MenuItem("GoPoo/Debug/White
+    Strip Demo")] static void WhiteStripDemo() { GameObject root = new GameObject("WhiteStripDemo");
+    root.AddComponent<Image>().color = Color.black;
+
+    GameObject tableBg = BuilderHelper.MakeChild(root, "TableBg"); tabl'
+  expected_outcome: WhiteStripDemo method is present and compiles; the prefab can
+    be built from the menu.
+  verify_command: grep -q 'MenuItem.*White Strip Demo' Assets/Editor/DebugDemoBuilder.cs
+    && grep -q 'SavePrefab(root, "WhiteStripDemo")' Assets/Editor/DebugDemoBuilder.cs
+  status: done
+  result: 'Done. **`WhiteStripDemo()` method appended** to `DebugDemoBuilder` class
+    at line 10–29. The method:
+
+
+    - Creates a `WhiteStripDemo` root `GameObject` with a black `Image`
+
+    - Adds a `TableBg` child stretc'
+  error: ''
+  retry_count: 0
+- id: '3'
+  description: Implement the AvatarDemo [MenuItem] method to test four sprite loading
+    approaches
+  instruction: 'Add this method inside the same class: [MenuItem("GoPoo/Debug/Avatar
+    Demo")] static void AvatarDemo() { GameObject root = new GameObject("AvatarDemo");
+    root.AddComponent<Image>().color = Color.black;
+
+    string[] labels = { "A: TrySet Res", "B: Direct Load", "C: TrySet Art", "D: Res.Load"
+    }; float xStar'
+  expected_outcome: AvatarDemo method is present with all four loading variants.
+  verify_command: grep -q 'MenuItem.*Avatar Demo' Assets/Editor/DebugDemoBuilder.cs
+    && grep -q 'SavePrefab(root, "AvatarDemo")' Assets/Editor/DebugDemoBuilder.cs
+  status: done
+  result: '**Done.** Added `AvatarDemo()` method at line 31 of `DebugDemoBuilder.cs`,
+    right after `WhiteStripDemo()`. The method creates four 200×200 panels in a row,
+    each attempting to load `avatar_poo_01` via '
+  error: ''
+  retry_count: 0
+- id: '4'
+  description: Implement the FanDemo [MenuItem] method to test card fan layout with
+    rotation and overlap
+  instruction: 'Add this method: [MenuItem("GoPoo/Debug/Fan Demo")] static void FanDemo()
+    { GameObject root = new GameObject("FanDemo"); root.AddComponent<Image>().color
+    = new Color(0.2f, 0.1f, 0.3f);
+
+    GameObject handArea = BuilderHelper.MakeChild(root, "HandArea"); RectTransform
+    haRt = handArea.AddComponent<RectTra'
+  expected_outcome: FanDemo method is present and produces an arc of 7 colored cards.
+  verify_command: grep -q 'MenuItem.*Fan Demo' Assets/Editor/DebugDemoBuilder.cs &&
+    grep -q 'SavePrefab(root, "FanDemo")' Assets/Editor/DebugDemoBuilder.cs
+  status: done
+  result: Added `FanDemo()` method to `DebugDemoBuilder.cs` (lines 76–112). It creates
+    a `FanDemo` prefab with a dark purple root, a `HandArea` child spanning 15%–85%
+    horizontally and 5%–40% vertically, and 7 c
+  error: ''
+  retry_count: 0
+- id: '5'
+  description: Final verification that all three menu items exist in the file and
+    no missing references
+  instruction: Run a quick grep to confirm exactly three distinct [MenuItem] attributes
+    are present, indicating all three demos have been added correctly.
+  expected_outcome: File is complete and ready for Unity compilation.
+  verify_command: grep -c 'MenuItem' Assets/Editor/DebugDemoBuilder.cs | grep -w 3
+  status: done
+  result: '**Confirmed.** All three `[MenuItem]` attributes are present in `DebugDemoBuilder.cs`:
+
+
+    | Line | Menu Path |
+
+    |------|-----------|
+
+    | 10 | `GoPoo/Debug/White Strip Demo` |
+
+    | 31 | `GoPoo/Debug/Avatar Dem'
+  error: ''
+  retry_count: 0

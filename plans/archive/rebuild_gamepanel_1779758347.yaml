@@ -1,0 +1,80 @@
+task_id: rebuild_gamepanel
+goal: '完整重建 GamePanel: 修复编译错误 → 刷新资源 → 重建 prefab → QA 截图 → 飞书报告'
+complexity: complex
+replan_count: 0
+created_at: '2026-05-26T09:10:00+08:00'
+knowledge_sources:
+- /Users/davidagent/Projects/game-studio-agents/base/engineering/wiki/pages/unity-gotchas.md
+- /Users/davidagent/Projects/gopoo-studio-project/engineering/wiki/pages/asset-paths.md
+tasks:
+- id: fix_compile_errors
+  agent: engineering
+  action: code
+  input: '修复 Assets/Editor/GamePanelBuilder.cs 和 Assets/Editor/DebugDemoBuilder.cs
+    的编译错误。 GamePanelBuilder 错误: effectMode/EffectMode 不存在 (UIEffect v5.10.8 无此属性，已在磁盘修正)。
+    DebugDemoBuilder 错误: MakeChild/Stretch/TrySetSprite/CreateText 调用签名不匹配 (已在磁盘修正)。
+    确认磁盘文件已正确，通过 MCP assets-refresh 强制 Tuanjie 重新编译。
+
+    '
+  status: done
+  started: '2026-05-26T01:19:47.379096+00:00'
+  completed: '2026-05-26T01:19:48.305551+00:00'
+  result: 'planner failed (deepseek): ERROR: deepseek: API key not set'
+- id: verify_zero_errors
+  agent: qa
+  action: review
+  input: 通过 MCP console-get-logs 检查编译错误数为 0。如有新错误则报告。
+  depends_on:
+  - fix_compile_errors
+  status: done
+  started: '2026-05-26T01:19:49.192955+00:00'
+  completed: '2026-05-26T01:20:47.215834+00:00'
+  result: "```json\n{\n  \"panel\": \"GamePanel\",\n  \"sections\": {\n    \"rendering\"\
+    : 6,\n    \"text\": 4,\n    \"touch\": 5,\n    \"layout\": 5,\n    \"hierarchy\"\
+    : 6,\n    \"players\": 5,\n    \"content\": 6,\n    \"consistency\": 5\n  },\n\
+    \  \"overall\": 5,\n  \"issues\": [\n    \"Text readability is poor throughout\
+    \ — 'Top Player', 'Left Player', 'Right Player' labels are very small and lack\
+    \ outline/stroke, nearly invisible against the dark purple background\",\n   \
+    \ \"The 'Pick an opponent or draw from Toilet' instruction text is tiny and hard "
+- id: rebuild_gamepanel
+  agent: engineering
+  action: code
+  input: '通过 MCP gopoo-exec-menu 执行 GoPoo/Build Panels/Game Panel 菜单项， 重新生成 GamePanel
+    prefab。
+
+    '
+  depends_on:
+  - verify_zero_errors
+  status: done
+  started: '2026-05-26T01:20:51.243681+00:00'
+  completed: '2026-05-26T01:20:52.128460+00:00'
+  result: 'planner failed (deepseek): ERROR: deepseek: API key not set'
+- id: screenshot_gamepanel
+  agent: qa
+  action: review
+  input: '通过 MCP gopoo-preview-panel 截图 GamePanel，保存到 Screenshots/gamepanel_rebuilt.png。
+    检查: 无白条、头像正常、扇形手牌正常、UI 元素齐全。
+
+    '
+  depends_on:
+  - rebuild_gamepanel
+  status: done
+  started: '2026-05-26T01:20:53.044091+00:00'
+  completed: '2026-05-26T01:21:47.548125+00:00'
+  result: "```json\n{\n  \"panel\": \"GamePanel\",\n  \"sections\": {\n    \"rendering\"\
+    : 6,\n    \"text\": 4,\n    \"touch\": 5,\n    \"layout\": 5,\n    \"hierarchy\"\
+    : 6,\n    \"players\": 5,\n    \"content\": 6,\n    \"consistency\": 6\n  },\n\
+    \  \"overall\": 5,\n  \"issues\": [\n    \"Player avatars are empty circles (no\
+    \ avatar image loaded) for Top, Left, Right, and Self — only dark ring placeholders\
+    \ visible\",\n    \"Player names ('Top Player', 'Left Player', 'Right Player')\
+    \ are very small and low-contrast against the dark purple background — nea"
+- id: report_feishu
+  agent: studio
+  action: report
+  input: 将 GamePanel 重建截图通过飞书发送给用户 DM。
+  depends_on:
+  - screenshot_gamepanel
+  status: done
+  started: '2026-05-26T01:21:48.514397+00:00'
+  completed: '2026-05-26T01:21:53.620003+00:00'
+  result: Image sent to Studio

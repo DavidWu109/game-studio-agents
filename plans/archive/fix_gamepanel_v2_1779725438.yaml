@@ -1,0 +1,65 @@
+task_id: fix_gamepanel_v2
+goal: "Fix 3 bugs in Assets/Editor/GamePanelBuilder.cs:\n\n1. GEAR ICON DEFORMED:\
+  \ The settings button at line ~533 uses anchors\n   (0.01,0.91)-(0.09,0.99) which\
+  \ is 8%x8% of screen. At 1920x1080 this\n   is 154x"
+complexity: complex
+replan_count: 2
+created_at: '2026-05-25T16:10:38.101886+00:00'
+completed_at: '2026-05-25T16:13:05.524511+00:00'
+knowledge_sources:
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-25.md
+- /Users/davidagent/Projects/gopoo-studio-project/engineering/wiki/pages/gamepanel-review-log.md
+- /Users/davidagent/Projects/game-studio-agents/base/engineering/wiki/pages/sprite-path-gotcha.md
+- /Users/davidagent/Projects/game-studio-agents/base/qa/wiki/pages/page-review-checklist.md
+- /Users/davidagent/Projects/gopoo-studio-project/design/wiki/pages/gamepanel-mockup-review.md
+steps:
+- id: '2'
+  description: Fix avatar not showing by checking Image component settings
+  instruction: 'In Assets/Editor/GamePanelBuilder.cs, locate the avatar Image setup
+    around lines 385-400.
+
+    Check and fix the following:
+
+    1. Ensure avatarImage.color = Color.white is set
+
+    2. Ensure avatarImage.preserveAspect = true is set
+
+    3. Check if there''s a mask component on the avatar or its parent that might be
+    bl'
+  expected_outcome: ''
+  verify_command: null
+  status: done
+  result: '## Summary
+
+
+    | Check | Status | Detail |
+
+    |---|---|---|
+
+    | `avatarImage.color = Color.white` | ✅ Already set | Line 395 |
+
+    | `avatarImage.preserveAspect = true` | ✅ Already set | Line 396 |
+
+    | Mask compone'
+  error: ''
+  retry_count: 0
+- id: '3'
+  description: Fix white strip by checking Canvas render mode and Camera background
+    color
+  instruction: 'In Assets/Editor/GamePanelBuilder.cs, locate the GamePanel root setup
+    and Backdrop creation.
+
+
+    Step 1: Read the file to find the relevant code sections:
+
+    - Search for "Canvas" or "renderMode" or "ScreenSpaceCamera" in the file
+
+    - Search for "Backdrop" creation and setup
+
+    - Search for "Camera" component '
+  expected_outcome: ''
+  verify_command: null
+  status: failed
+  result: ''
+  error: 'ERROR: max tool rounds (8) reached'
+  retry_count: 1

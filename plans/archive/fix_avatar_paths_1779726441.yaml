@@ -1,0 +1,111 @@
+task_id: fix_avatar_paths
+goal: "In Assets/Editor/GamePanelBuilder.cs, check ALL TrySetSprite calls that\nreference\
+  \ avatar sprites. Use bash grep to find them quickly:\n\n  grep -n \"avatar\" Assets/Editor/GamePanelBuilder.cs\n\
+  \nEvery avata"
+complexity: complex
+replan_count: 0
+created_at: '2026-05-25T16:27:21.592917+00:00'
+completed_at: '2026-05-25T16:28:39.013815+00:00'
+knowledge_sources:
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-25.md
+- /Users/davidagent/Projects/gopoo-studio-project/design/wiki/pages/gamepanel-mockup-review.md
+- /Users/davidagent/Projects/gopoo-studio-project/engineering/wiki/pages/gamepanel-review-log.md
+- /Users/davidagent/Projects/game-studio-agents/base/qa/wiki/pages/page-review-checklist.md
+- /Users/davidagent/Projects/game-studio-agents/base/design/wiki/pages/self-review-failure.md
+steps:
+- id: '1'
+  description: Find all avatar-related TrySetSprite calls in GamePanelBuilder.cs
+  instruction: Use bash grep to find all lines containing "avatar" in Assets/Editor/GamePanelBuilder.cs
+  expected_outcome: A list of matching lines with line numbers showing current avatar
+    sprite paths
+  verify_command: grep -n "avatar" Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: 'Here are all lines containing "avatar" in `Assets/Editor/GamePanelBuilder.cs`:
+
+
+    | Line | Content |
+
+    |------|---------|
+
+    | 231 | Comment: OpTop AvatarSection position |
+
+    | 233 | Comment: Top opponent sizi'
+  error: ''
+  retry_count: 0
+- id: '2'
+  description: Fix TrySetSprite call using "Cards/avatar_poo_01" (missing Resources/
+    prefix)
+  instruction: In Assets/Editor/GamePanelBuilder.cs, find the line with "Cards/avatar_poo_01"
+    and change it to "Resources/Cards/avatar_poo_01"
+  expected_outcome: The path is now "Resources/Cards/avatar_poo_01" with proper prefix
+  verify_command: grep -n "Resources/Cards/avatar_poo_01" Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: 'All three occurrences of `avatar_poo_01` in `GamePanelBuilder.cs` **already
+    have** the `Resources/` prefix:
+
+
+    - Line 396: `TrySetSprite(pAvatarImg, "Resources/Cards/avatar_poo_01");`
+
+    - Line 1056: `TryS'
+  error: ''
+  retry_count: 0
+- id: '3'
+  description: Fix TrySetSprite call using "Art/Icons/avatar_poo_01" (wrong directory)
+  instruction: In Assets/Editor/GamePanelBuilder.cs, find the line with "Art/Icons/avatar_poo_01"
+    and change it to "Resources/Cards/avatar_poo_01"
+  expected_outcome: The path is now "Resources/Cards/avatar_poo_01" instead of "Art/Icons/avatar_poo_01"
+  verify_command: grep -n "Resources/Cards/avatar_poo_01" Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: The change has **already been applied**. All three occurrences of `avatar_poo_01`
+    in `GamePanelBuilder.cs` are already `"Resources/Cards/avatar_poo_01"` — there's
+    no `"Art/Icons/avatar_poo_01"` left i
+  error: ''
+  retry_count: 0
+- id: '4'
+  description: Fix TrySetSprite call using "Cards/avatar_frame" (missing Resources/
+    prefix)
+  instruction: In Assets/Editor/GamePanelBuilder.cs, find the line with "Cards/avatar_frame"
+    and change it to "Resources/Cards/avatar_frame"
+  expected_outcome: The path is now "Resources/Cards/avatar_frame" with proper prefix
+  verify_command: grep -n "Resources/Cards/avatar_frame" Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: 'The change is **already in place**. Both occurrences of `avatar_frame`
+    in `GamePanelBuilder.cs` already have the `Resources/` prefix:
+
+
+    - **Line 404:** `TrySetSprite(pFrameImg, "Resources/Cards/avatar_'
+  error: ''
+  retry_count: 0
+- id: '5'
+  description: Fix TrySetSprite call using "Art/Icons/avatar_frame" (wrong directory)
+  instruction: In Assets/Editor/GamePanelBuilder.cs, find the line with "Art/Icons/avatar_frame"
+    and change it to "Resources/Cards/avatar_frame"
+  expected_outcome: The path is now "Resources/Cards/avatar_frame" instead of "Art/Icons/avatar_frame"
+  verify_command: grep -n "Resources/Cards/avatar_frame" Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: 'The change is **already in place**. Both occurrences of `avatar_frame`
+    in `GamePanelBuilder.cs` already read `Resources/Cards/avatar_frame`:
+
+
+    - Line 404: `TrySetSprite(pFrameImg, "Resources/Cards/avat'
+  error: ''
+  retry_count: 0
+- id: '6'
+  description: Verify all avatar paths are now correct
+  instruction: Run grep again to confirm all avatar references use "Resources/Cards/"
+    prefix
+  expected_outcome: All avatar-related TrySetSprite calls now use "Resources/Cards/avatar_poo_01"
+    or "Resources/Cards/avatar_frame"
+  verify_command: grep -n "avatar" Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: '## Confirmation: All avatar references use `Resources/Cards/` prefix ✅
+
+
+    Here''s the complete audit of all **avatar-related** `TrySetSprite` calls in `GamePanelBuilder.cs`:
+
+
+    | Line | Call | Prefix |
+
+    |--'
+  error: ''
+  retry_count: 0

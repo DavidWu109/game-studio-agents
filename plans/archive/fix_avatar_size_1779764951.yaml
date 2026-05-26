@@ -1,0 +1,71 @@
+task_id: fix_avatar_size
+goal: 对照 mockup 设计稿，修复 GamePanel 头像尺寸 — 头像应该是面板顶部的小图标，不是大头照。去掉圆框，缩小到 mockup 比例。然后重建
+  prefab、play mode 截图、飞书报告对比 mockup。
+complexity: complex
+replan_count: 0
+tasks:
+- id: fix_avatar_anchors
+  agent: engineering
+  action: code
+  provider: cli
+  input: '对照 mockup 设计稿 /Users/davidagent/Projects/gopoo-studio-project/design/mockups/gamepanel_mockup.png，
+    修复 /Users/davidagent/Projects/go-poo-client/Assets/Editor/GamePanelBuilder.cs
+    的头像尺寸。
+
+    Mockup 中的头像特征： - Top Player: 头像是面板顶部很小的 poo icon，大约占面板 15% 宽度 - Left/Right Player:
+    头像在侧边面板顶部，占面板约 25-30% 高度 - Player (左下 YOU): 小头像在面板上方，下面是名字和 Poo 计数 - 所有头像都没有额外圆框装饰，直接显示原图
+
+    当前代码中 Player avatar anchor 是 (0.25,0.62)-(0.75,0.95)，太大了。 Top opponent anchor
+    是 (0.02,0.55)-(0.15,0.90)，也偏大。 Left/Right opponent anchor 是 (0.25,0.68)-(0.75,0.95)，也偏大。
+
+    请缩小这些 anchor 到接近 mockup 的比例。 不需要圆框(avatar_frame)，不需要 CircleClip shader material。
+    保留 AspectRatioFitter(FitInParent, 1:1) 保证正方形。 保留 preserveAspect = true。
+
+    '
+  status: done
+  started: '2026-05-26T03:09:15.821958+00:00'
+  completed: '2026-05-26T03:13:52.269458+00:00'
+  result: "[3] OK: Shrunk the Player (YOU) avatar anchors in `GamePanelBuilder.cs:241`:\n\
+    - **anchorMin**: `(0.35, 0.75)` → `(0.40, 0.80)` \n- **anchorMax**: `(0.65, 0.95)`\
+    \ → `(0.60, 0.95)`\n- Width reduced from 30% → 20%, \n[4] OK: The top opponent\
+    \ avatar anchors at line 710 are already `(0.04, 0.65)-(0.14, 0.90)` — exactly\
+    \ the target values. No change needed; this step is already done.\n[5] OK: The\
+    \ anchors are already at `(0.30, 0.72)-(0.70, 0.95)` — exactly the target values.\
+    \ No change needed; this step is al"
+- id: rebuild_and_screenshot
+  agent: engineering
+  action: code
+  provider: cli
+  input: '通过 MCP 重建 GamePanel 并用 play mode 截图： 1. bash /tmp/mcp.sh init 2. bash /tmp/mcp.sh
+    call "assets-refresh" ''{}'' 3. 等待 5 秒 4. bash /tmp/mcp.sh call "gopoo-exec-menu"
+    ''{"menuPath":"GoPoo/Build Panels/Game Panel"}'' 5. 等待 2 秒 6. bash /tmp/mcp.sh
+    call "gopoo-game-state" ''{"state":"default","outPath":"Screenshots/gp_avatar_mockup_match.png"}''
+    7. 等待 10 秒确保截图完成
+
+    '
+  depends_on:
+  - fix_avatar_anchors
+  status: done
+  started: '2026-05-26T03:13:53.284795+00:00'
+  completed: '2026-05-26T03:14:56.277619+00:00'
+  result: 'All steps completed successfully:
+
+
+    1. **Assets refreshed** — Unity AssetDatabase synced
+
+    2. **GamePanel rebuilt** — via `GoPoo/Build Panels/Game Panel` menu
+
+    3. **Screenshot captured** — `Screenshots/gp_avatar_mockup_match.png` shows the
+    default game state with the toilet/poo theme, player avatars with crowns, card
+    hand, and "YOUR TURN!" header. UI elements visible: direction bar, poo indicator,
+    exit button, and flash button.'
+- id: send_comparison
+  agent: studio
+  action: report
+  input: 将 mockup 和最新截图发送到飞书 DM 对比
+  depends_on:
+  - rebuild_and_screenshot
+  status: done
+  started: '2026-05-26T03:15:00.449063+00:00'
+  completed: '2026-05-26T03:15:06.036074+00:00'
+  result: Image sent to Studio

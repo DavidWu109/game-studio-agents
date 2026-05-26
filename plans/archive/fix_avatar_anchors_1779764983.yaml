@@ -1,0 +1,127 @@
+task_id: fix_avatar_anchors
+goal: '对照 mockup 设计稿 /Users/davidagent/Projects/gopoo-studio-project/design/mockups/gamepanel_mockup.png，
+  修复 /Users/davidagent/Projects/go-poo-client/Assets/Editor/GamePanelBuilder.cs 的头像尺寸。
+
+  Mockup 中的头像特征： -'
+complexity: complex
+replan_count: 1
+created_at: '2026-05-26T03:09:43.762929+00:00'
+completed_at: '2026-05-26T03:13:52.263787+00:00'
+knowledge_sources:
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-25.md
+- /Users/davidagent/Projects/game-studio-agents/base/design/wiki/pages/layout-spec-bridge.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-26.md
+- /Users/davidagent/Projects/gopoo-studio-project/design/wiki/pages/gamepanel-mockup-review.md
+- /Users/davidagent/Projects/game-studio-agents/base/qa/wiki/pages/page-review-checklist.md
+steps:
+- id: '1'
+  description: Read the current GamePanelBuilder.cs to locate avatar anchor values
+  instruction: read_file /Users/davidagent/Projects/go-poo-client/Assets/Editor/GamePanelBuilder.cs
+  expected_outcome: Full file content visible, can identify all avatar anchor definitions
+    for Player, Top, Left, and Right opponents
+  verify_command: grep -n "avatar" /Users/davidagent/Projects/go-poo-client/Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: 'Here''s a summary of all avatar anchor definitions in GamePanelBuilder.cs:
+
+
+    **Player Avatar** (line 240-249):
+
+    - Parent: `PlayerInfo` anchored at `(0.03, 0.03)→(0.20, 0.30)` within SafeContent
+
+    - Avatar '
+  error: ''
+  retry_count: 0
+- id: '2'
+  description: Review the mockup design for avatar sizing reference
+  instruction: read_file /Users/davidagent/Projects/gopoo-studio-project/design/mockups/gamepanel_mockup.png
+  expected_outcome: Visual confirmation of avatar proportions — small poo icons, no
+    circle frames, roughly 15% width for top and 25-30% height for sides
+  verify_command: null
+  status: done
+  result: 'Here''s what I see in the mockup for avatar proportions:
+
+
+    **Top Player (opponent at top center):**
+
+    - Small poo icon, no circle frame — just the poo character sitting directly on
+    the background
+
+    - Roughl'
+  error: ''
+  retry_count: 0
+- id: '3'
+  description: Shrink Player (YOU) avatar anchors
+  instruction: Shrink Player (YOU) avatar anchors
+  expected_outcome: ''
+  verify_command: null
+  status: done
+  result: "Shrunk the Player (YOU) avatar anchors in `GamePanelBuilder.cs:241`:\n\
+    - **anchorMin**: `(0.35, 0.75)` → `(0.40, 0.80)` \n- **anchorMax**: `(0.65, 0.95)`\
+    \ → `(0.60, 0.95)`\n- Width reduced from 30% → 20%, "
+  error: ''
+  retry_count: 0
+- id: '4'
+  description: Shrink Top opponent avatar anchors from (0.02,0.55)-(0.15,0.90) to
+    (0.04,0.65)-(0.14,0.90)
+  instruction: Shrink Top opponent avatar anchors from (0.02,0.55)-(0.15,0.90) to
+    (0.04,0.65)-(0.14,0.90)
+  expected_outcome: ''
+  verify_command: null
+  status: done
+  result: The top opponent avatar anchors at line 710 are already `(0.04, 0.65)-(0.14,
+    0.90)` — exactly the target values. No change needed; this step is already done.
+  error: ''
+  retry_count: 0
+- id: '5'
+  description: Shrink Left/Right opponent avatar anchors from (0.25,0.68)-(0.75,0.95)
+    to (0.30,0.72)-(0.70,0.95)
+  instruction: Shrink Left/Right opponent avatar anchors from (0.25,0.68)-(0.75,0.95)
+    to (0.30,0.72)-(0.70,0.95)
+  expected_outcome: ''
+  verify_command: null
+  status: done
+  result: The anchors are already at `(0.30, 0.72)-(0.70, 0.95)` — exactly the target
+    values. No change needed; this step is already done.
+  error: ''
+  retry_count: 0
+- id: '6'
+  description: Remove avatar_frame creation if present
+  instruction: Remove avatar_frame creation if present
+  expected_outcome: ''
+  verify_command: null
+  status: done
+  result: No `avatar_frame` references exist in the current `GamePanelBuilder.cs`.
+    This step is already complete — the avatar_frame creation was removed in a prior
+    refactor. Nothing to change.
+  error: ''
+  retry_count: 0
+- id: '7'
+  description: Verify AspectRatioFitter and preserveAspect are still present
+  instruction: Verify AspectRatioFitter and preserveAspect are still present
+  expected_outcome: ''
+  verify_command: null
+  status: done
+  result: 'Verified. Both avatar locations in `GamePanelBuilder.cs` have `AspectRatioFitter`
+    and `preserveAspect = true`:
+
+
+    - **Player avatar** (line 242-247): `AspectRatioFitter` with `FitInParent` mode
+    + `prese'
+  error: ''
+  retry_count: 0
+- id: '8'
+  description: Final validation — all avatar anchors updated, no frame/shader artifacts
+  instruction: Final validation — all avatar anchors updated, no frame/shader artifacts
+  expected_outcome: ''
+  verify_command: null
+  status: done
+  result: 'Final validation complete. All checks pass:
+
+
+    **Avatar anchors (all correct):**
+
+    - **Player (YOU)**: `(0.40, 0.80)-(0.60, 0.95)` — small icon, no frame
+
+    - **Top opponent**: `(0.04, 0.65)-(0.14, 0.90)` — '
+  error: ''
+  retry_count: 0

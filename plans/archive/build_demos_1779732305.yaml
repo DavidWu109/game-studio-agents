@@ -1,0 +1,152 @@
+task_id: build_demos
+goal: 'Trigger all 3 demo builds via MCP:
+
+  curl -s http://localhost:25891/api/tools/gopoo-exec-menu -X POST -H "Content-Type:
+  application/json" -d ''{"menuPath":"Assets/Refresh"}''
+
+  sleep 3
+
+  curl -s http://localh'
+complexity: complex
+replan_count: 0
+created_at: '2026-05-25T18:05:05.105614+00:00'
+completed_at: '2026-05-25T18:06:37.671500+00:00'
+knowledge_sources:
+- /Users/davidagent/Projects/gopoo-studio-project/engineering/wiki/pages/asset-paths.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-25.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-24.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-26.md
+- /Users/davidagent/Projects/game-studio-agents/base/qa/wiki/pages/page-review-checklist.md
+steps:
+- id: '1'
+  description: Trigger Unity Assets/Refresh to prepare build environment
+  instruction: 'bash: curl -s -o /tmp/gopoo_build_refresh.json http://localhost:25891/api/tools/gopoo-exec-menu
+    -X POST -H ''Content-Type: application/json'' -d ''{"menuPath":"Assets/Refresh"}'''
+  expected_outcome: Refresh executed successfully, JSON response saved to /tmp/gopoo_build_refresh.json
+  verify_command: grep -q 'success' /tmp/gopoo_build_refresh.json
+  status: done
+  result: '**Done.** Unity Asset Database refresh executed successfully.
+
+
+    Response saved to `/tmp/gopoo_build_refresh.json`:
+
+
+    ```json
+
+    {"status":"success","structured":{"result":"executed: Assets/Refresh"}}
+
+    ```'
+  error: ''
+  retry_count: 0
+- id: '2'
+  description: Wait 3 seconds for Refresh to complete
+  instruction: 'bash: sleep 3'
+  expected_outcome: Delay completed
+  verify_command: null
+  status: done
+  result: '**Step 2 complete.** The `sleep 3` delay finished successfully with no
+    output (exit code 0). Ready for the next step.'
+  error: ''
+  retry_count: 0
+- id: '3'
+  description: Trigger White Strip Demo build
+  instruction: 'bash: curl -s -o /tmp/gopoo_build_whitestrip.json http://localhost:25891/api/tools/gopoo-exec-menu
+    -X POST -H ''Content-Type: application/json'' -d ''{"menuPath":"GoPoo/Debug/White
+    Strip Demo"}'''
+  expected_outcome: White Strip Demo build triggered and response saved
+  verify_command: grep -q 'success' /tmp/gopoo_build_whitestrip.json
+  status: done
+  result: '**Step 3 result:** The menu item `GoPoo/Debug/White Strip Demo` was **not
+    found** in the Unity project.
+
+
+    The API returned:
+
+    ```
+
+    ERROR: menu not found or failed: GoPoo/Debug/White Strip Demo
+
+    ```
+
+
+    **Avai'
+  error: ''
+  retry_count: 0
+- id: '4'
+  description: Wait 2 seconds between builds
+  instruction: 'bash: sleep 2'
+  expected_outcome: Delay
+  verify_command: null
+  status: done
+  result: '**Step 4 complete.** The `sleep 2` delay finished successfully (exit code
+    0). Ready for the next step.'
+  error: ''
+  retry_count: 0
+- id: '5'
+  description: Trigger Avatar Demo build
+  instruction: 'bash: curl -s -o /tmp/gopoo_build_avatar.json http://localhost:25891/api/tools/gopoo-exec-menu
+    -X POST -H ''Content-Type: application/json'' -d ''{"menuPath":"GoPoo/Debug/Avatar
+    Demo"}'''
+  expected_outcome: Avatar Demo build triggered
+  verify_command: grep -q 'success' /tmp/gopoo_build_avatar.json
+  status: done
+  result: '**Step 5 result:** `GoPoo/Debug/Avatar Demo` was **not found**, same as
+    the White Strip Demo in Step 3.
+
+
+    There is **no `GoPoo/Debug/` submenu** in the project at all. The full list of
+    available menu i'
+  error: ''
+  retry_count: 0
+- id: '6'
+  description: Wait 2 seconds between builds
+  instruction: 'bash: sleep 2'
+  expected_outcome: Delay
+  verify_command: null
+  status: done
+  result: '**Step 6 complete.** The `sleep 2` delay finished successfully (exit code
+    0). Ready for the next step.'
+  error: ''
+  retry_count: 0
+- id: '7'
+  description: Trigger Fan Demo build
+  instruction: 'bash: curl -s -o /tmp/gopoo_build_fan.json http://localhost:25891/api/tools/gopoo-exec-menu
+    -X POST -H ''Content-Type: application/json'' -d ''{"menuPath":"GoPoo/Debug/Fan
+    Demo"}'''
+  expected_outcome: Fan Demo build triggered
+  verify_command: grep -q 'success' /tmp/gopoo_build_fan.json
+  status: done
+  result: 'All three expected demo menu items are **missing** from the project:
+
+
+    | Expected Menu Item | Status |
+
+    |---|---|
+
+    | `GoPoo/Debug/White Strip Demo` | ❌ Not found |
+
+    | `GoPoo/Debug/Avatar Demo` | ❌ Not fou'
+  error: ''
+  retry_count: 0
+- id: '8'
+  description: Collect and report results of all builds
+  instruction: 'bash: echo ''Build Results:''; echo ''Refresh:'' $(cat /tmp/gopoo_build_refresh.json);
+    echo ''White Strip:'' $(cat /tmp/gopoo_build_whitestrip.json); echo ''Avatar:''
+    $(cat /tmp/gopoo_build_avatar.json); echo ''Fan:'' $(cat /tmp/gopoo_build_fan.json)'
+  expected_outcome: All build responses printed to stdout
+  verify_command: null
+  status: done
+  result: '## Build Results Summary
+
+
+    | Operation | Status |
+
+    |---|---|
+
+    | **Assets/Refresh** | ✅ Success |
+
+    | **GoPoo/Debug/White Strip Demo** | ❌ Menu not found |
+
+    | **GoPoo/Debug/Avatar Demo** | ❌ Menu not found |'
+  error: ''
+  retry_count: 0

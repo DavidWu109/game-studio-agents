@@ -1,0 +1,141 @@
+task_id: recode_gamepanel_builder
+goal: '重新编写 /Users/davidagent/Projects/go-poo-client/Assets/Editor/GamePanelBuilder.cs。
+
+  要求: 1. 读取 Assets/Scripts/UI/GamePanel.cs 获取所有 public 字段定义 2. 读取 Assets/Editor/BuilderHelper.cs
+  获取可用的 helper 方法签名 3. 读取 '
+complexity: complex
+replan_count: 0
+created_at: '2026-05-26T01:33:07.870010+00:00'
+completed_at: '2026-05-26T01:36:06.216097+00:00'
+knowledge_sources:
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-25.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-26.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/agent-coding-guidelines.md
+- /Users/davidagent/Projects/gopoo-studio-project/design/wiki/pages/gamepanel-mockup-review.md
+- /Users/davidagent/Projects/gopoo-studio-project/engineering/wiki/pages/gamepanel-review-log.md
+steps:
+- id: read_uieffect_api
+  description: Verify UIEffect v5.10.8 API has no effectMode property
+  instruction: Read Library/PackageCache/com.coffee.ui-effect@70937d2ce3/Runtime/UIEffect.cs
+    lines 1-100 to confirm shadowMode/shadowColor/shadowColorGlow properties exist
+    and effectMode does NOT exist.
+  expected_outcome: Confirm UIEffect uses shadowMode, shadowDistance, shadowIteration,
+    shadowBlurIntensity, shadowColorFilter, shadowColor, shadowColorGlow — no effectMode.
+  verify_command: grep -c 'effectMode' /Users/davidagent/Projects/go-poo-client/Library/PackageCache/com.coffee.ui-effect@70937d2ce3/Runtime/UIEffect.cs
+    || true
+  status: done
+  result: '**Confirmed.** UIEffect API uses:
+
+
+    - `shadowMode` (ShadowMode enum) — line 838
+
+    - `shadowDistance` (Vector2) — line 850
+
+    - `shadowIteration` (int) — line 873
+
+    - `shadowBlurIntensity` (float) — line 897
+
+    -'
+  error: ''
+  retry_count: 0
+- id: rewrite_gamepanelbuilder
+  description: Rewrite Assets/Editor/GamePanelBuilder.cs with all fixes
+  instruction: 'Rewrite /Users/davidagent/Projects/go-poo-client/Assets/Editor/GamePanelBuilder.cs
+    with these changes:
+
+    1. Keep `using static BuilderHelper;` at the top
+
+    2. Keep the CardPrefab build logic unchanged
+
+    3. Keep the OpArea struct but ADD a `displayText` field (TMP_Text) for separate
+    Display wiring
+
+    4. In Cr'
+  expected_outcome: GamePanelBuilder.cs compiles without errors, wires ALL GamePanel
+    public fields, uses only valid UIEffect v5 API
+  verify_command: grep -c 'effectMode' /Users/davidagent/Projects/go-poo-client/Assets/Editor/GamePanelBuilder.cs;
+    grep -c 'panel.turnPromptBg' /Users/davidagent/Projects/go-poo-client/Assets/Editor/GamePanelBuilder.cs;
+    grep -c 'panel.toastItemPrefab' /Users/davidagent/Projects/go-poo-client/Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: 'Good — no `effectMode`/`EffectMode` usage. Here''s a summary of all changes
+    made to `GamePanelBuilder.cs`:
+
+
+    1. **OpArea struct** — added `displayText` field (TMP_Text) for separate Display
+    wiring
+
+    2. **'
+  error: ''
+  retry_count: 0
+- id: verify_all_fields_wired
+  description: Verify every public field from GamePanel.cs is assigned in the builder
+  instruction: Run grep to extract all `panel.XXX =` assignments in GamePanelBuilder.cs
+    and cross-reference against the public fields in GamePanel.cs. Every public field
+    must have a corresponding wire-up line.
+  expected_outcome: All 71 public fields (opponentTop through floatingScoreText) have
+    matching `panel.fieldName =` lines in the builder
+  verify_command: grep -c 'panel\.' /Users/davidagent/Projects/go-poo-client/Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: 'All fields accounted for. Here''s the cross-reference result:
+
+
+    **67 simple fields + 4 array fields = 71 public fields total**
+
+
+    Every field in GamePanel.cs has a matching `panel.fieldName =` line in Gam'
+  error: ''
+  retry_count: 0
+- id: verify_static_methods
+  description: Confirm CreatePooCount and SetupHighlightEffect are static
+  instruction: Grep for the method signatures in GamePanelBuilder.cs to confirm they
+    are declared as static.
+  expected_outcome: Both methods declared with `static` keyword
+  verify_command: grep -E 'static.*(CreatePooCount|SetupHighlightEffect)' /Users/davidagent/Projects/go-poo-client/Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: '**Verification complete:**
+
+
+    | Method | File | Static? |
+
+    |--------|------|---------|
+
+    | `BuildGamePanel()` | `GamePanelBuilder.cs:157` | Yes |
+
+    | `WhiteStripDemo()` | `DebugDemoBuilder.cs:13` | Yes |
+
+    | `'
+  error: ''
+  retry_count: 0
+- id: fix_debugdemobuilder
+  description: Fix DebugDemoBuilder.cs to use correct BuilderHelper signatures
+  instruction: "Review /Users/davidagent/Projects/go-poo-client/Assets/Editor/DebugDemoBuilder.cs:\n\
+    - Confirm `using static BuilderHelper;` is present\n- Confirm all method calls\
+    \ match BuilderHelper signatures:\n  - Stretch(RectTransform) — currently called\
+    \ as Stretch(rootRT) where rootRT is RectTransform ✓\n  - MakeCh"
+  expected_outcome: DebugDemoBuilder.cs compiles cleanly with BuilderHelper's actual
+    method signatures
+  verify_command: grep -n 'CreateButton\|CreateButtonWithSprite\|CreateButtonWithSpriteAndLabel'
+    /Users/davidagent/Projects/go-poo-client/Assets/Editor/DebugDemoBuilder.cs ||
+    echo 'no button calls - OK'
+  status: done
+  result: 'All method calls in DebugDemoBuilder.cs match BuilderHelper''s actual signatures
+    exactly:
+
+
+    - `Stretch(RectTransform)` — matches line 278
+
+    - `MakeChild(Transform, string, Vector2, Vector2, Vector2, Vecto'
+  error: ''
+  retry_count: 0
+- id: verify_no_effectmode
+  description: 'Final check: no effectMode usage anywhere in Editor scripts'
+  instruction: Grep all .cs files under Assets/Editor/ for 'effectMode' or 'EffectMode'
+    to confirm zero occurrences.
+  expected_outcome: Zero matches for effectMode/EffectMode in any Editor script
+  verify_command: 'grep -r ''effectMode\|EffectMode'' /Users/davidagent/Projects/go-poo-client/Assets/Editor/
+    || echo ''PASS: no effectMode found'''
+  status: done
+  result: Zero matches. No `effectMode` or `EffectMode` references exist in any `.cs`
+    file under `Assets/Editor/`. The cleanup is confirmed complete.
+  error: ''
+  retry_count: 0

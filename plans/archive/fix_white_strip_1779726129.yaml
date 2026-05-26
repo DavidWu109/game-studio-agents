@@ -1,0 +1,167 @@
+task_id: fix_white_strip
+goal: 'In Assets/Editor/GamePanelBuilder.cs, fix the white strip at the bottom.
+
+
+  Root cause: SafeAreaAdapter shrinks the SafeContent child, exposing the area
+
+  below it. The current fix adds a black Image to r'
+complexity: complex
+replan_count: 2
+created_at: '2026-05-25T16:22:09.678135+00:00'
+completed_at: ''
+knowledge_sources:
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-25.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/agent-coding-guidelines.md
+steps:
+- id: 1_check_root_image
+  description: Check if root GameObject in GamePanelBuilder has an Image component
+    with Color.black
+  instruction: Read Assets/Editor/GamePanelBuilder.cs and search for any existing
+    Image component on the root GameObject (likely named 'GamePanel' or similar).
+    Look for lines like 'gameObject.AddComponent<Image>()' or 'GetComponent<Image>()'
+    or 'image.color = Color.black'.
+  expected_outcome: Understand whether root already has a black Image component, or
+    if there is a separate Backdrop child.
+  verify_command: grep -n 'Image\|Backdrop\|Color.black' Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: '## Result: Root Already Has Black Image — No Separate Backdrop
+
+
+    The root `GamePanel` GameObject **already has a black Image component** directly
+    on itself. Here are the exact lines (186–192):
+
+
+    ```csha'
+  error: ''
+  retry_count: 0
+- id: 2_add_image_to_root
+  description: Add Image component with Color.black to root GameObject if missing
+  instruction: 'In Assets/Editor/GamePanelBuilder.cs, find the method that sets up
+    the UI hierarchy (likely Awake or Start or a setup method). Add code to ensure
+    the root GameObject (the one this script is attached to) has an Image component
+    with color=Color.black. Example: var img = gameObject.GetComponent<Image>('
+  expected_outcome: Root GameObject now has an Image component with black color, covering
+    full screen.
+  verify_command: grep -n 'AddComponent<Image>\|GetComponent<Image>\|img.color = Color.black'
+    Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: 'Looking at the file, the `BuildGamePanel()` method (line 184) already has
+    the root black Image code at **lines 189-192**:
+
+
+    ```csharp
+
+    // Root itself is black — catches any gaps from SafeArea shrinking '
+  error: ''
+  retry_count: 0
+- id: 3_remove_backdrop_child_v2
+  description: Remove any separate Backdrop child GameObject references in Assets/Editor/GamePanelBuilder.cs.
+    The previous attempt likely failed because the code creates Backdrop dynamically
+    or the search pattern was too narrow. Search for ALL occurrences of 'Backdrop'
+    (case-sensitive) in the file. For each occurrence, remove the entire statement
+    that creates or references it. If the Backdrop is created inside a conditional
+    block, remove the entire block. If it's referenced in a variable assignment, remove
+    the assignment. Do NOT leave commented-out code — delete the lines.
+  instruction: In Assets/Editor/GamePanelBuilder.cs, find every line containing 'Backdrop'.
+    For each line, determine if it's part of a larger statement (e.g., `var backdrop
+    = new GameObject("Backdrop");` or `backdrop.transform.SetParent(...)`). Remove
+    the entire statement. If the Backdrop is created inside an `if`
+  expected_outcome: ''
+  verify_command: null
+  status: done
+  result: 'No `Backdrop` references remain in `Assets/Editor/GamePanelBuilder.cs`.
+    The file is already clean — prior steps removed them all.
+
+
+    For completeness, here''s what I found:
+
+
+    | Location | Status |
+
+    |---|--'
+  error: ''
+  retry_count: 0
+- id: 4_verify_no_safearea_on_root
+  description: Confirm SafeAreaAdapter is NOT on root GameObject. After removing Backdrop,
+    verify that the root GameObject (GamePanel) does not have a SafeAreaAdapter component.
+    If it does, remove it. Also verify that SafeAreaAdapter is only on the SafeContent
+    child.
+  instruction: In Assets/Editor/GamePanelBuilder.cs, search for any code that adds
+    a SafeAreaAdapter component. Ensure it is only added to the SafeContent child
+    GameObject, NOT to the root GamePanel GameObject. If any code adds SafeAreaAdapter
+    to root, remove or fix it. Save the file.
+  expected_outcome: ''
+  verify_command: null
+  status: done
+  result: '**Verification complete — no changes needed.**
+
+
+    The file `GamePanelBuilder.cs` has only one reference to SafeArea (line 189),
+    and it''s just a comment:
+
+
+    ```
+
+    // Root itself is black — catches any gaps f'
+  error: ''
+  retry_count: 0
+- id: 5_verify_root_image_full_screen
+  description: Verify root Image covers full screen with correct anchors and no SafeAreaAdapter
+  instruction: 'In Assets/Editor/GamePanelBuilder.cs, find the code that creates the
+    root Image (likely in BuildGamePanel).
+
+    The current code may be setting anchors incorrectly or missing full-screen configuration.
+
+
+    Fix the code to ensure:
+
+    1. The Image is on the root GameObject (named "GamePanel" or similar)
+
+    2. Colo'
+  expected_outcome: ''
+  verify_command: null
+  status: in_progress
+  result: ''
+  error: ''
+  retry_count: 0
+- id: 6_verify_no_other_backdrop_references
+  description: Search entire project for any other Backdrop references that might
+    create a separate backdrop GameObject
+  instruction: 'Search the entire project (Assets/ folder) for any references to ''Backdrop''
+    that might create a separate backdrop GameObject. This includes:
+
+    - Prefabs (.prefab files)
+
+    - Scenes (.unity files)
+
+    - Other C# scripts (.cs files)
+
+    - Any other asset files
+
+
+    Use grep or search tools to find all occurrences. If '
+  expected_outcome: ''
+  verify_command: null
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: 7_verify_fix_in_editor
+  description: Open the GamePanel prefab/scene in Unity Editor to verify the fix works
+    visually
+  instruction: 'Open the GamePanel prefab or scene in Unity Editor (if available)
+    to verify:
+
+    1. The root GameObject has a black Image that covers the full screen
+
+    2. The SafeContent child has SafeAreaAdapter but the root does not
+
+    3. When SafeAreaAdapter shrinks SafeContent, the black background remains full-screen
+
+    4'
+  expected_outcome: ''
+  verify_command: null
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0

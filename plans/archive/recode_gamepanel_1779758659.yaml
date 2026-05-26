@@ -1,0 +1,118 @@
+task_id: recode_gamepanel
+goal: 重新编写 GamePanelBuilder.cs — 基于 GamePanel.cs 的字段定义，从零生成完整的 Builder 代码，修复所有已知问题（effectMode、DebugDemoBuilder
+  签名错误），然后重建 prefab、QA 截图、飞书报告
+complexity: complex
+replan_count: 0
+knowledge_sources:
+- /Users/davidagent/Projects/gopoo-studio-project/engineering/wiki/pages/asset-paths.md
+- /Users/davidagent/Projects/game-studio-agents/base/engineering/wiki/pages/unity-gotchas.md
+tasks:
+- id: recode_gamepanel_builder
+  agent: engineering
+  action: code
+  provider: cli
+  input: "重新编写 /Users/davidagent/Projects/go-poo-client/Assets/Editor/GamePanelBuilder.cs。\n\
+    要求: 1. 读取 Assets/Scripts/UI/GamePanel.cs 获取所有 public 字段定义 2. 读取 Assets/Editor/BuilderHelper.cs\
+    \ 获取可用的 helper 方法签名 3. 读取 Coffee.UIEffects UIEffect API (Library/PackageCache/com.coffee.ui-effect@70937d2ce3/Runtime/UIEffect.cs)\n\
+    \   确认: UIEffect v5.10.8 没有 effectMode 属性，用 shadowMode/shadowColor/shadowColorGlow\
+    \ 等属性\n4. 重写 GamePanelBuilder.cs:\n   - using static BuilderHelper; \n   - 所有\
+    \ GamePanel 的 public 字段必须被 wire up\n   - UIEffect 只用 shadowMode, shadowDistance,\
+    \ shadowIteration, shadowBlurIntensity, shadowColorFilter, shadowColor, shadowColorGlow\n\
+    \   - 不要用 effectMode / EffectMode\n   - CreatePooCount 必须定义为 static 方法\n   - SetupHighlightEffect\
+    \ 必须定义为 static 方法\n   - 保持现有的 CardPrefab build 逻辑\n   - 保持现有的 OpArea struct 和\
+    \ CreateOpArea 方法\n5. 同时修复 Assets/Editor/DebugDemoBuilder.cs 使用正确的 BuilderHelper\
+    \ 签名\n"
+  status: done
+  started: '2026-05-26T01:31:38.188474+00:00'
+  completed: '2026-05-26T01:36:06.222169+00:00'
+  result: '[read_uieffect_api] OK: **Confirmed.** UIEffect API uses:
+
+
+    - `shadowMode` (ShadowMode enum) — line 838
+
+    - `shadowDistance` (Vector2) — line 850
+
+    - `shadowIteration` (int) — line 873
+
+    - `shadowBlurIntensity` (float) — line 897
+
+    -
+
+    [rewrite_gamepanelbuilder] OK: Good — no `effectMode`/`EffectMode` usage. Here''s
+    a summary of all changes made to `GamePanelBuilder.cs`:
+
+
+    1. **OpArea struct** — added `displayText` field (TMP_Text) for separate Display
+    wiring
+
+    2. **
+
+    [verify_all_fields_wired] OK: All fields ac'
+- id: refresh_and_compile
+  agent: engineering
+  action: code
+  provider: cli
+  input: '通过 bash 执行 MCP 调用刷新 Unity 资源并验证编译: 1. bash /tmp/mcp.sh init 2. bash /tmp/mcp.sh
+    call "assets-refresh" ''{}'' 3. 等待 5 秒 4. bash /tmp/mcp.sh call "console-get-logs"
+    ''{"maxEntries":20,"logTypeFilter":"Error"}'' 5. 确认没有新的编译错误 (忽略时间戳早于当前时间的历史错误)
+
+    '
+  depends_on:
+  - recode_gamepanel_builder
+  status: done
+  started: '2026-05-26T01:36:07.243580+00:00'
+  completed: '2026-05-26T01:36:44.871531+00:00'
+  result: '**Results: No new compilation errors.** The asset refresh completed successfully.
+    All 20 errors in the log are **historical**, falling into two known categories:
+
+
+    1. **SDF Font load failures** (Fredoka SDF, BubblegumSans SDF) — recurring since
+    `02:06:41`, triggered when `GamePanelBuilder` runs. These are pre-existing asset
+    corruption / version mismatch issues, not new.
+
+
+    2. **`Script / Execute` tool failures** (cluster at `08:54:27–08:54:59`) — MCP
+    tool invocation errors from an earlier session, '
+- id: build_gamepanel_prefab
+  agent: engineering
+  action: code
+  provider: cli
+  input: '通过 MCP 执行 GamePanel 重建: bash /tmp/mcp.sh call "gopoo-exec-menu" ''{"menuPath":"GoPoo/Build
+    Panels/Game Panel"}''
+
+    '
+  depends_on:
+  - refresh_and_compile
+  status: done
+  started: '2026-05-26T01:36:45.892774+00:00'
+  completed: '2026-05-26T01:36:56.262806+00:00'
+  result: GamePanel prefab 已通过 `GoPoo/Build Panels/Game Panel` 菜单重建完成。Builder 重新生成了
+    `GamePanel` prefab。
+- id: qa_screenshot
+  agent: qa
+  action: review
+  input: '截图并评审重建后的 GamePanel。检查: 无白条、头像正常、手牌扇形正常、所有 UI 元素齐全。'
+  depends_on:
+  - build_gamepanel_prefab
+  status: done
+  started: '2026-05-26T01:37:00.392209+00:00'
+  completed: '2026-05-26T01:37:53.249436+00:00'
+  result: '```json
+
+    {"panel": "GamePanel", "sections": {"rendering": 6, "text": 4, "touch": 5, "layout":
+    5, "hierarchy": 6, "players": 5, "content": 6, "consistency": 5}, "overall": 5,
+    "issues": ["Top Player avatar is an empty dark circle — sprite not loading or
+    missing placeholder", "Left Player and Right Player avatars are also empty dark
+    circles with no loaded image", "Bottom-left self avatar (''You'') is an empty
+    dark circle — no avatar sprite rendering", "Text throughout is extremely small
+    and barely rea'
+- id: send_feishu
+  agent: studio
+  action: report
+  input: 将 GamePanel 重建截图发送到飞书 DM。
+  depends_on:
+  - qa_screenshot
+  status: done
+  started: '2026-05-26T01:37:54.233725+00:00'
+  completed: '2026-05-26T01:37:58.876408+00:00'
+  result: Image sent to Studio

@@ -1,0 +1,75 @@
+task_id: fix_gear_icon
+goal: "In Assets/Editor/GamePanelBuilder.cs, fix the Settings button (gear icon).\n\
+  \nCurrent code (around line 530):\n  var settings = CreateButtonWithSprite(safe.transform,\
+  \ \"Settings\", \"\",\n      Vector2.zero, "
+complexity: complex
+replan_count: 0
+created_at: '2026-05-25T16:19:44.307227+00:00'
+completed_at: '2026-05-25T16:20:29.611409+00:00'
+knowledge_sources:
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-25.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/agent-coding-guidelines.md
+steps:
+- id: 1_read_file_state
+  description: Read the current state of GamePanelBuilder.cs to confirm exact code
+    around line 530
+  instruction: Use read_file to read Assets/Editor/GamePanelBuilder.cs, focusing on
+    lines 520-540
+  expected_outcome: Confirm the exact code snippet for the Settings button creation
+    and anchor setup
+  verify_command: grep -n 'CreateButtonWithSprite.*Settings' Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: "Here's the **Settings button creation and anchor setup** (lines 530–539):\n\
+    \n```csharp\n// === Settings ===\nvar settings = CreateButtonWithSprite(safe.transform,\
+    \ \"Settings\", \"\",\n    Vector2.zero, new Vec"
+  error: ''
+  retry_count: 0
+- id: 2_check_preserveAspect
+  description: Check if preserveAspect=true is already set on the Image component
+    for the Settings button
+  instruction: Search for 'preserveAspect' in Assets/Editor/GamePanelBuilder.cs around
+    the Settings button code
+  expected_outcome: Determine if preserveAspect is already set to true or needs to
+    be added
+  verify_command: grep -n 'preserveAspect' Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: '## Result: `preserveAspect` is already `true` on the Settings button
+
+
+    Line 539 in `GamePanelBuilder.cs`:
+
+
+    ```csharp
+
+    settings.GetComponent<Image>().preserveAspect = true;
+
+    ```
+
+
+    The Settings button (crea'
+  error: ''
+  retry_count: 0
+- id: 3_add_preserveAspect_if_missing
+  description: Add preserveAspect=true to the Image component of the Settings button
+    if not already present
+  instruction: Use edit_file to insert 'settingsImage.preserveAspect = true;' after
+    the CreateButtonWithSprite line in Assets/Editor/GamePanelBuilder.cs, assuming
+    the returned Image component is stored in a variable named 'settingsImage' (adjust
+    variable name based on actual code)
+  expected_outcome: The Image component for the Settings button now has preserveAspect
+    set to true
+  verify_command: grep -n 'preserveAspect.*true' Assets/Editor/GamePanelBuilder.cs
+  status: done
+  result: 'The `preserveAspect = true` is **already present** on line 539:
+
+
+    ```csharp
+
+    settings.GetComponent<Image>().preserveAspect = true;
+
+    ```
+
+
+    This was added right after the anchor/position setup for the Setti'
+  error: ''
+  retry_count: 0

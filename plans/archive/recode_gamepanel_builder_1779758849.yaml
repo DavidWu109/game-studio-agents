@@ -1,0 +1,167 @@
+task_id: recode_gamepanel_builder
+goal: '重新编写 /Users/davidagent/Projects/go-poo-client/Assets/Editor/GamePanelBuilder.cs。
+
+  要求: 1. 读取 Assets/Scripts/UI/GamePanel.cs 获取所有 public 字段定义 2. 读取 Assets/Editor/BuilderHelper.cs
+  获取可用的 helper 方法签名 3. 读取 '
+complexity: complex
+replan_count: 0
+created_at: '2026-05-26T01:27:29.742943+00:00'
+completed_at: '2026-05-26T01:27:29.753991+00:00'
+knowledge_sources:
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-25.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/session-2026-05-26.md
+- /Users/davidagent/Projects/game-studio-agents/base/studio/wiki/pages/agent-coding-guidelines.md
+- /Users/davidagent/Projects/gopoo-studio-project/design/wiki/pages/gamepanel-mockup-review.md
+- /Users/davidagent/Projects/gopoo-studio-project/engineering/wiki/pages/gamepanel-review-log.md
+steps:
+- id: '1'
+  description: Read GamePanel.cs public fields to catalog all fields that must be
+    wired
+  instruction: read_file Assets/Scripts/UI/GamePanel.cs lines 31-140 to extract every
+    public field declaration
+  expected_outcome: 'Complete list of 50+ public fields across headers: Opponent Slots,
+    Poo Zones, Opponent Hand Areas, Toilet, Exit Confirm, Center, Hand, Hand Layout,
+    Turn Prompt, Category Picker, Category Status, Player Card, Opponent Avatars,
+    Diarrhea Response, Poo Story, Turn Prompt CG, Effects'
+  verify_command: grep -c 'public ' Assets/Scripts/UI/GamePanel.cs
+  status: failed
+  result: ''
+  error: 'ERROR: deepseek: API key not set'
+  retry_count: 1
+- id: '2'
+  description: Read BuilderHelper.cs to confirm all available helper method signatures
+  instruction: 'read_file Assets/Editor/BuilderHelper.cs to verify signatures: CreateFilled,
+    CreateSafeContent, CreateAnchored, CreateText(parent,name,text,fontSize,align,pos,size),
+    CreateButton, CreateButtonWithSprite(parent,name,label,pos,size,spritePath), CreateButtonWithSpriteAndLabel,
+    TrySetSprite(img,path,sli'
+  expected_outcome: Confirmed method signatures match usage in new GamePanelBuilder
+  verify_command: null
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '3'
+  description: Verify UIEffect v5.10.8 has no effectMode property
+  instruction: 'bash: grep -n ''effectMode\|EffectMode'' Library/PackageCache/com.coffee.ui-effect@70937d2ce3/Runtime/UIEffect.cs
+    | head -5'
+  expected_outcome: No matches or only enum references — confirms effectMode property
+    does not exist in this version
+  verify_command: grep -c 'public.*effectMode' Library/PackageCache/com.coffee.ui-effect@70937d2ce3/Runtime/UIEffect.cs
+    || echo 0
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '4'
+  description: Rewrite GamePanelBuilder.cs — fix missing wire-ups for turnPromptBg
+    and toastItemPrefab
+  instruction: 'edit_file Assets/Editor/GamePanelBuilder.cs. In the wire-up section
+    (after line 558 ''var panel = root.AddComponent<GamePanel>()''), add the two missing
+    assignments: panel.turnPromptBg = tpBgImg; (the Image on TurnPrompt GO, already
+    created as tpBgImg at line 217) and panel.toastItemPrefab — create a '
+  expected_outcome: GamePanelBuilder.cs compiles cleanly, all 50+ GamePanel public
+    fields are wired, no effectMode usage
+  verify_command: grep -c 'panel\.' Assets/Editor/GamePanelBuilder.cs
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '5'
+  description: Add panel.turnPromptBg wire-up
+  instruction: 'edit_file Assets/Editor/GamePanelBuilder.cs — in the wire-up block,
+    after the line ''panel.turnPromptCG = tpCG;'', add: panel.turnPromptBg = tpBgImg;'
+  expected_outcome: turnPromptBg is now wired to the Image component on the TurnPrompt
+    GameObject
+  verify_command: grep 'panel\.turnPromptBg' Assets/Editor/GamePanelBuilder.cs
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '6'
+  description: Create ToastItemTemplate and wire toastItemPrefab
+  instruction: 'edit_file Assets/Editor/GamePanelBuilder.cs — after the toastArea
+    creation block (around line 353), add a ToastItemTemplate child: var toastTemplate
+    = new GameObject(''ToastItemTemplate''); toastTemplate.transform.SetParent(toastArea.transform,
+    false); var ttRT = toastTemplate.AddComponent<RectTransfo'
+  expected_outcome: toastItemPrefab is now wired to a template GameObject under ToastArea
+  verify_command: grep 'panel\.toastItemPrefab' Assets/Editor/GamePanelBuilder.cs
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '7'
+  description: Fix opTopDisplay/opLeftDisplay/opRightDisplay wiring — currently points
+    to nameText instead of separate display text
+  instruction: edit_file Assets/Editor/GamePanelBuilder.cs — in the OpArea struct,
+    add a 'TMP_Text displayText;' field. In CreateOpArea, create a separate Display
+    text node below the name for each opponent. Then wire panel.opTopDisplay = opTop.displayText;
+    panel.opLeftDisplay = opLeft.displayText; panel.opRightDis
+  expected_outcome: opXxxDisplay fields are wired to distinct TMP_Text objects separate
+    from opXxxText
+  verify_command: grep 'displayText' Assets/Editor/GamePanelBuilder.cs
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '8'
+  description: Verify no effectMode/EffectMode usage in final GamePanelBuilder.cs
+  instruction: 'bash: grep -n ''effectMode\|EffectMode'' Assets/Editor/GamePanelBuilder.cs'
+  expected_outcome: No matches found
+  verify_command: grep -c 'effectMode' Assets/Editor/GamePanelBuilder.cs || echo 0
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '9'
+  description: Verify CreatePooCount is declared static
+  instruction: 'bash: grep -n ''CreatePooCount'' Assets/Editor/GamePanelBuilder.cs'
+  expected_outcome: Method signature includes 'static' keyword
+  verify_command: grep 'static.*CreatePooCount' Assets/Editor/GamePanelBuilder.cs
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '10'
+  description: Verify SetupHighlightEffect is declared static
+  instruction: 'bash: grep -n ''SetupHighlightEffect'' Assets/Editor/GamePanelBuilder.cs'
+  expected_outcome: Method signature includes 'static' keyword
+  verify_command: grep 'static.*SetupHighlightEffect' Assets/Editor/GamePanelBuilder.cs
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '11'
+  description: Verify all GamePanel public fields are wired in builder
+  instruction: 'bash: for field in opponentTop opponentLeft opponentRight opTopText
+    opLeftText opRightText opTopHighlight opLeftHighlight opRightHighlight opTopButton
+    opLeftButton opRightButton opTopDisplay opLeftDisplay opRightDisplay playerPooZone
+    opTopPooZone opLeftPooZone opRightPooZone playerPooCount opTopPooC'
+  expected_outcome: No MISSING output — all fields are wired
+  verify_command: Same as instruction command
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '12'
+  description: Verify DebugDemoBuilder.cs compiles with BuilderHelper signatures
+  instruction: 'read_file Assets/Editor/DebugDemoBuilder.cs and verify all BuilderHelper
+    calls match current signatures: Stretch(RectTransform), MakeChild(Transform,string,Vector2,Vector2,Vector2,Vector2),
+    TrySetSprite(Image,string), CreateSafeContent(Transform), CreateText(Transform,string,string,int,TextAlignment'
+  expected_outcome: All call signatures match BuilderHelper.cs — no changes needed
+    to DebugDemoBuilder.cs
+  verify_command: grep -n 'Stretch\|MakeChild\|TrySetSprite\|CreateSafeContent\|CreateText\|SavePrefab'
+    Assets/Editor/DebugDemoBuilder.cs
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
+- id: '13'
+  description: Verify using static BuilderHelper present in GamePanelBuilder
+  instruction: 'bash: head -10 Assets/Editor/GamePanelBuilder.cs | grep ''using static
+    BuilderHelper'''
+  expected_outcome: '''using static BuilderHelper;'' appears in the using directives'
+  verify_command: grep 'using static BuilderHelper' Assets/Editor/GamePanelBuilder.cs
+  status: planned
+  result: ''
+  error: ''
+  retry_count: 0
