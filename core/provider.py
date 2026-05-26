@@ -379,15 +379,27 @@ def run_phase(phase: str, prompt: str, system: str = "",
     max_tokens = pc.get("max_tokens", 4096)
 
     if provider == "sdk":
-        return run_sdk(prompt, system=system, model_key=model_key,
-                       max_tokens=max_tokens, phase=phase)
+        result = run_sdk(prompt, system=system, model_key=model_key,
+                         max_tokens=max_tokens, phase=phase)
     elif provider == "cli":
-        return run_cli(prompt, cwd=cwd)
+        result = run_cli(prompt, cwd=cwd)
     elif provider == "deepseek":
-        return run_deepseek(prompt, system=system, max_tokens=max_tokens)
+        result = run_deepseek(prompt, system=system, max_tokens=max_tokens)
     else:
-        return ProviderResult(text=f"ERROR: unknown provider '{provider}'",
-                              provider=provider, model="")
+        result = ProviderResult(text=f"ERROR: unknown provider '{provider}'",
+                                provider=provider, model="")
+
+    try:
+        from core.db import emit_event
+        emit_event("provider_call", phase=phase, data={
+            "provider": result.provider, "model": result.model,
+            "input_tokens": result.input_tokens, "output_tokens": result.output_tokens,
+            "cost_usd": result.cost_usd, "latency_ms": result.latency_ms,
+        })
+    except Exception:
+        pass
+
+    return result
 
 
 # ---------------------------------------------------------------------------

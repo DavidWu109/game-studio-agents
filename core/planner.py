@@ -131,6 +131,15 @@ class Planner:
         self.save_plan(plan, plan_path)
         logger.info("[%s] plan generated: %d steps", task_id, len(plan.steps))
 
+        try:
+            from core.db import record_step, emit_event
+            for step in plan.steps:
+                record_step(task_id, step.id, step.description, step.instruction, step.expected_outcome)
+            emit_event("plan_generated", task_id=task_id, phase="plan",
+                       data={"step_count": len(plan.steps), "complexity": complexity.value})
+        except Exception:
+            pass
+
         result = self.execute_plan(plan, plan_path, task=task)
         return result
 
@@ -356,8 +365,13 @@ class Planner:
             step.status = StepStatus.IN_PROGRESS
             self.save_plan(plan, plan_path)
             logger.info("[%s] executing: %s", step.id, step.description)
+            try:
+                from core.db import update_step as _db_us, emit_event as _db_em
+                _db_em("step_started", task_id=plan.task_id, step_id=step.id, phase="execute")
+            except Exception:
+                pass
 
-            success, result = self._execute_step(plan, step)
+            success, result, step_pr = self._execute_step(plan, step)
 
             if success and step.verify_command:
                 verified, verify_details = self._verify_step(step)
@@ -370,11 +384,24 @@ class Planner:
                 step.result = result
                 all_results.append(f"[{step.id}] OK: {result[:200]}")
                 logger.info("[%s] done", step.id)
+                try:
+                    from core.db import update_step as _db_us, emit_event as _db_em
+                    _db_us(plan.task_id, step.id, "done", result=result, provider_result=step_pr)
+                    _db_em("step_done", task_id=plan.task_id, step_id=step.id, phase="execute")
+                except Exception:
+                    pass
             else:
                 step.status = StepStatus.FAILED
                 step.error = result
                 step.retry_count += 1
                 logger.warning("[%s] failed: %s", step.id, result[:200])
+                try:
+                    from core.db import update_step as _db_us, emit_event as _db_em
+                    _db_us(plan.task_id, step.id, "failed", error=result, provider_result=step_pr)
+                    _db_em("step_failed", task_id=plan.task_id, step_id=step.id, phase="execute",
+                           data={"error": result[:200]})
+                except Exception:
+                    pass
 
                 if plan.replan_count < plan.max_replans:
                     revised = self.replan(plan, step, result)
@@ -436,7 +463,7 @@ class Planner:
                 pass
         return "\n\n".join(blocks) if blocks else ""
 
-    def _execute_step(self, plan: Plan, step: PlanStep) -> Tuple[bool, str]:
+    def _execute_step(self, plan: Plan, step: PlanStep) -> Tuple[bool, str, ProviderResult]:
         prior_context = "\n".join(
             f"- {s.id}: {s.result[:100]}"
             for s in plan.steps if s.status == StepStatus.DONE
@@ -477,9 +504,9 @@ class Planner:
         result = run_phase("execute", prompt, cwd=self.cwd)
 
         if result.text.startswith("ERROR:"):
-            return False, result.text
+            return False, result.text, result
 
-        return True, result.text
+        return True, result.text, result
 
     def _verify_step(self, step: PlanStep) -> Tuple[bool, str]:
         if not step.verify_command:

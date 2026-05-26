@@ -382,6 +382,12 @@ def _run_task(task: dict, yaml_path: Path, resources: ResourceManager) -> tuple[
             return task_id, f"SAFETY_BLOCK: {reason}"
 
         mark_status(yaml_path, task_id, "in_progress")
+        try:
+            from core.db import update_task_status as _db_update, emit_event as _db_emit
+            _db_update(task_id, "in_progress")
+            _db_emit("task_started", task_id=task_id, dispatch_id=yaml_path.stem)
+        except Exception:
+            pass
         notify(agent, f"⚙️ 开始: {task_id}")
         logger.info("Starting: %s (%s.%s)", task_id, agent, action)
 
@@ -456,6 +462,14 @@ def dispatch_loop(yaml_path: Path, poll_interval: int = 15, dry_run: bool = Fals
     logger.info("Dispatch: %s (%d tasks)", goal, total)
     notify("Studio", f"🚀 Dispatch 开始: {goal}\n任务数: {total}\n{get_status_summary(data)}")
 
+    try:
+        from core.db import record_dispatch, record_task as _db_record_task
+        record_dispatch(yaml_path.stem, goal, str(yaml_path))
+        for t in data["tasks"]:
+            _db_record_task(t["id"], yaml_path.stem, t["agent"], t["action"], t.get("input", ""))
+    except Exception:
+        pass
+
     if dry_run:
         ready = get_ready_tasks(data)
         logger.info("Dry run — ready tasks: %s", [t["id"] for t in ready])
@@ -506,14 +520,32 @@ def dispatch_loop(yaml_path: Path, poll_interval: int = 15, dry_run: bool = Fals
 
                 if result.startswith("ERROR:") or result.startswith("SAFETY_BLOCK:"):
                     mark_status(yaml_path, tid, "blocked", error=result)
+                    try:
+                        from core.db import update_task_status as _du, emit_event as _de
+                        _du(tid, "blocked", error=result)
+                        _de("task_blocked", task_id=tid, dispatch_id=yaml_path.stem, data={"error": result[:200]})
+                    except Exception:
+                        pass
                     notify(task["agent"], f"❌ {tid}: {result[:150]}")
                     logger.error("Blocked: %s → %s", tid, result[:100])
                 elif result.startswith("INVALID:"):
                     mark_status(yaml_path, tid, "blocked", error=result)
+                    try:
+                        from core.db import update_task_status as _du, emit_event as _de
+                        _du(tid, "blocked", error=result)
+                        _de("task_blocked", task_id=tid, dispatch_id=yaml_path.stem, data={"error": result[:200]})
+                    except Exception:
+                        pass
                     notify(task["agent"], f"⚠️ {tid} 结果无效，标记阻塞:\n{result[:150]}")
                     logger.warning("Invalid: %s → %s", tid, result[:100])
                 else:
                     mark_status(yaml_path, tid, "done", result=result)
+                    try:
+                        from core.db import update_task_status as _du, emit_event as _de
+                        _du(tid, "done", result=result)
+                        _de("task_done", task_id=tid, dispatch_id=yaml_path.stem, data={"result": result[:200]})
+                    except Exception:
+                        pass
                     notify(task["agent"], f"✅ {tid}\n{result[:150]}")
                     logger.info("Done: %s → %s", tid, result[:80])
             except Exception as e:
@@ -533,6 +565,13 @@ def dispatch_loop(yaml_path: Path, poll_interval: int = 15, dry_run: bool = Fals
     summary = "\n".join(lines)
     notify("Studio", f"📋 Dispatch 完了: {goal}\n\n{summary}")
     logger.info("Dispatch finished:\n%s", summary)
+
+    try:
+        from core.db import finish_dispatch
+        has_blocked = any(t.get("status") == "blocked" for t in data["tasks"])
+        finish_dispatch(yaml_path.stem, "failed" if has_blocked else "done")
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------

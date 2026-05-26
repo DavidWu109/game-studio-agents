@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anvil Dashboard</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0a0a0f; --surface: #13131a; --border: #1e1e2e;
+  --text: #e0e0e8; --muted: #6b6b80; --accent: #6c5ce7;
+  --green: #00b894; --yellow: #fdcb6e; --red: #e17055; --blue: #74b9ff;
+}
+body { font-family: -apple-system, 'SF Pro', system-ui, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Header */
+.header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.header h1 { font-size: 16px; font-weight: 600; }
+.header h1 span { color: var(--accent); }
+.conn-status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.conn-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); }
+.conn-dot.connected { background: var(--green); }
+
+/* Main layout */
+.main { flex: 1; display: grid; grid-template-columns: 200px 1fr 340px; overflow: hidden; }
+
+/* Left: Agents */
+.agents-panel { border-right: 1px solid var(--border); padding: 12px; overflow-y: auto; }
+.agents-panel h2 { font-size: 11px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; letter-spacing: 1px; }
+.agent-card { padding: 10px; border-radius: 8px; background: var(--surface); margin-bottom: 6px; border: 1px solid var(--border); }
+.agent-card .name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.agent-card .status { font-size: 11px; display: flex; align-items: center; gap: 4px; }
+.agent-card .status .dot { width: 5px; height: 5px; border-radius: 50%; }
+.agent-card.idle .dot { background: var(--green); }
+.agent-card.busy .dot { background: var(--yellow); }
+.agent-card.failed .dot { background: var(--red); }
+.agent-card .task-info { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+/* Center: Kanban */
+.kanban { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 12px; overflow-y: auto; }
+.kanban-col { background: var(--surface); border-radius: 8px; padding: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; }
+.kanban-col h3 { font-size: 11px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; letter-spacing: 1px; display: flex; justify-content: space-between; }
+.kanban-col h3 .count { background: var(--border); padding: 1px 6px; border-radius: 10px; font-size: 10px; }
+.kanban-cards { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.task-card { padding: 8px; border-radius: 6px; background: var(--bg); cursor: pointer; border: 1px solid transparent; transition: border-color 0.15s; }
+.task-card:hover { border-color: var(--accent); }
+.task-card.selected { border-color: var(--accent); background: #1a1a2e; }
+.task-card .task-id { font-size: 12px; font-weight: 600; }
+.task-card .task-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.task-card .badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 600; }
+.badge-art { background: #e17055; color: white; }
+.badge-engineering { background: #6c5ce7; color: white; }
+.badge-qa { background: #00b894; color: white; }
+.badge-design { background: #fdcb6e; color: #333; }
+.badge-studio { background: #74b9ff; color: #333; }
+
+/* Right: Detail */
+.detail-panel { border-left: 1px solid var(--border); padding: 12px; overflow-y: auto; }
+.detail-panel h2 { font-size: 11px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; letter-spacing: 1px; }
+.detail-empty { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; }
+.detail-header { margin-bottom: 12px; }
+.detail-header .task-name { font-size: 15px; font-weight: 600; }
+.detail-header .detail-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* Phase indicator */
+.phases { display: flex; gap: 2px; margin: 12px 0; }
+.phase { flex: 1; text-align: center; padding: 4px; font-size: 10px; border-radius: 4px; background: var(--border); color: var(--muted); }
+.phase.active { background: var(--accent); color: white; }
+.phase.done { background: var(--green); color: white; }
+
+/* Steps */
+.step { padding: 8px; border-radius: 6px; background: var(--bg); margin-bottom: 4px; border: 1px solid var(--border); cursor: pointer; }
+.step-header { display: flex; justify-content: space-between; align-items: center; }
+.step-header .step-name { font-size: 12px; font-weight: 500; }
+.step-status { font-size: 10px; padding: 1px 5px; border-radius: 3px; }
+.step-status.planned { background: var(--border); color: var(--muted); }
+.step-status.in_progress { background: var(--yellow); color: #333; }
+.step-status.done { background: var(--green); color: white; }
+.step-status.failed { background: var(--red); color: white; }
+.step-detail { display: none; margin-top: 6px; font-size: 11px; color: var(--muted); }
+.step-detail.open { display: block; }
+.step-detail pre { background: var(--surface); padding: 6px; border-radius: 4px; margin-top: 4px; overflow-x: auto; white-space: pre-wrap; font-size: 10px; }
+.step-cost { display: flex; gap: 8px; margin-top: 4px; font-size: 10px; color: var(--muted); }
+
+/* Bottom: Stats */
+.stats-bar { display: flex; gap: 20px; padding: 8px 20px; border-top: 1px solid var(--border); background: var(--surface); font-size: 11px; }
+.stat { display: flex; align-items: center; gap: 4px; }
+.stat .label { color: var(--muted); }
+.stat .value { font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>Anvil</span> Dashboard</h1>
+  <div class="conn-status">
+    <div class="conn-dot" id="connDot"></div>
+    <span id="connText">connecting...</span>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: Agent Status -->
+  <div class="agents-panel">
+    <h2>Agents</h2>
+    <div id="agentList"></div>
+  </div>
+
+  <!-- Center: Kanban -->
+  <div class="kanban">
+    <div class="kanban-col">
+      <h3>Planned <span class="count" id="countPlanned">0</span></h3>
+      <div class="kanban-cards" id="colPlanned"></div>
+    </div>
+    <div class="kanban-col">
+      <h3>In Progress <span class="count" id="countInProgress">0</span></h3>
+      <div class="kanban-cards" id="colInProgress"></div>
+    </div>
+    <div class="kanban-col">
+      <h3>Done <span class="count" id="countDone">0</span></h3>
+      <div class="kanban-cards" id="colDone"></div>
+    </div>
+    <div class="kanban-col">
+      <h3>Blocked <span class="count" id="countBlocked">0</span></h3>
+      <div class="kanban-cards" id="colBlocked"></div>
+    </div>
+  </div>
+
+  <!-- Right: Detail -->
+  <div class="detail-panel">
+    <h2>Task Detail</h2>
+    <div id="detailContent">
+      <div class="detail-empty">Select a task to view details</div>
+    </div>
+  </div>
+</div>
+
+<div class="stats-bar" id="statsBar">
+  <div class="stat"><span class="label">Tasks:</span> <span class="value" id="statTasks">0</span></div>
+  <div class="stat"><span class="label">Tokens:</span> <span class="value" id="statTokens">0</span></div>
+  <div class="stat"><span class="label">Cost:</span> <span class="value" id="statCost">$0.00</span></div>
+  <div class="stat"><span class="label">Latency:</span> <span class="value" id="statLatency">0s</span></div>
+</div>
+
+<script>
+const AGENTS = ['art', 'engineering', 'design', 'qa', 'studio'];
+const COLS = { planned: 'colPlanned', in_progress: 'colInProgress', done: 'colDone', blocked: 'colBlocked', failed: 'colBlocked' };
+
+let tasks = {};
+let selectedTaskId = null;
+let lastEventId = 0;
+
+// --- Agent Cards ---
+function initAgents() {
+  const el = document.getElementById('agentList');
+  el.innerHTML = AGENTS.map(a => `
+    <div class="agent-card idle" id="agent-${a}">
+      <div class="name">${a}</div>
+      <div class="status"><div class="dot"></div> <span>idle</span></div>
+      <div class="task-info">-</div>
+    </div>
+  `).join('');
+}
+
+function updateAgents() {
+  const busy = {};
+  Object.values(tasks).forEach(t => {
+    if (t.status === 'in_progress') busy[t.agent] = t.id;
+  });
+  AGENTS.forEach(a => {
+    const card = document.getElementById(`agent-${a}`);
+    if (!card) return;
+    const isBusy = busy[a];
+    card.className = `agent-card ${isBusy ? 'busy' : 'idle'}`;
+    card.querySelector('.status span').textContent = isBusy ? 'busy' : 'idle';
+    card.querySelector('.task-info').textContent = isBusy || '-';
+  });
+}
+
+// --- Task Cards ---
+function badgeClass(agent) { return `badge badge-${agent}`; }
+
+function renderKanban() {
+  Object.values(COLS).forEach(id => document.getElementById(id).innerHTML = '');
+  const counts = { planned: 0, in_progress: 0, done: 0, blocked: 0 };
+
+  Object.values(tasks).sort((a, b) => (b.started_at || '').localeCompare(a.started_at || '')).forEach(t => {
+    const col = COLS[t.status] || COLS.planned;
+    const status = t.status === 'failed' ? 'blocked' : (t.status || 'planned');
+    counts[status] = (counts[status] || 0) + 1;
+
+    const card = document.createElement('div');
+    card.className = `task-card${t.id === selectedTaskId ? ' selected' : ''}`;
+    card.innerHTML = `
+      <div class="task-id">${t.id}</div>
+      <div class="task-meta">
+        <span class="${badgeClass(t.agent)}">${t.agent}</span>
+        ${t.action || ''}
+        ${t.total_cost_usd > 0 ? ` · $${t.total_cost_usd.toFixed(4)}` : ''}
+      </div>
+    `;
+    card.onclick = () => selectTask(t.id);
+    document.getElementById(col).appendChild(card);
+  });
+
+  Object.entries(counts).forEach(([k, v]) => {
+    const el = document.getElementById(`count${k.charAt(0).toUpperCase() + k.slice(1).replace('_p', 'P')}`);
+    if (el) el.textContent = v;
+  });
+}
+
+// --- Task Detail ---
+async function selectTask(taskId) {
+  selectedTaskId = taskId;
+  renderKanban();
+
+  const res = await fetch(`/api/tasks/${taskId}`);
+  const detail = await res.json();
+  if (detail.error) return;
+
+  const steps = detail.steps || [];
+  const dc = document.getElementById('detailContent');
+
+  dc.innerHTML = `
+    <div class="detail-header">
+      <div class="task-name">${detail.id}</div>
+      <div class="detail-meta">
+        <span class="${badgeClass(detail.agent)}">${detail.agent}</span>
+        ${detail.action || ''} · ${detail.status}
+        ${detail.total_cost_usd > 0 ? ` · $${detail.total_cost_usd.toFixed(4)}` : ''}
+      </div>
+    </div>
+
+    <div class="phases">
+      <div class="phase ${steps.length > 0 ? 'done' : ''}">classify</div>
+      <div class="phase ${steps.length > 0 ? 'done' : ''}">plan</div>
+      <div class="phase ${detail.status === 'in_progress' ? 'active' : (detail.status === 'done' ? 'done' : '')}">execute</div>
+      <div class="phase">replan</div>
+    </div>
+
+    ${detail.input ? `<div style="font-size:11px;color:var(--muted);margin-bottom:8px;max-height:60px;overflow:auto">${detail.input}</div>` : ''}
+
+    <h2 style="margin-top:12px">Steps (${steps.length})</h2>
+    ${steps.map(s => `
+      <div class="step" onclick="this.querySelector('.step-detail').classList.toggle('open')">
+        <div class="step-header">
+          <span class="step-name">${s.id}</span>
+          <span class="step-status ${s.status}">${s.status}</span>
+        </div>
+        <div class="step-detail">
+          <div>${s.description || ''}</div>
+          ${s.instruction ? `<pre>${escHtml(s.instruction)}</pre>` : ''}
+          ${s.result ? `<pre style="border-left:2px solid var(--green)">${escHtml(s.result)}</pre>` : ''}
+          ${s.error ? `<pre style="border-left:2px solid var(--red)">${escHtml(s.error)}</pre>` : ''}
+          <div class="step-cost">
+            ${s.provider ? `<span>${s.provider}/${s.model}</span>` : ''}
+            ${s.input_tokens ? `<span>${s.input_tokens}+${s.output_tokens} tok</span>` : ''}
+            ${s.cost_usd > 0 ? `<span>$${s.cost_usd.toFixed(4)}</span>` : ''}
+            ${s.latency_ms > 0 ? `<span>${(s.latency_ms/1000).toFixed(1)}s</span>` : ''}
+          </div>
+        </div>
+      </div>
+    `).join('')}
+
+    ${detail.status === 'in_progress' ? `
+      <button onclick="cancelTask('${detail.id}')" style="margin-top:12px;padding:6px 12px;background:var(--red);color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px">Cancel Task</button>
+    ` : ''}
+  `;
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function cancelTask(taskId) {
+  if (!confirm(`Cancel task ${taskId}?`)) return;
+  await fetch(`/api/tasks/${taskId}/cancel`, { method: 'POST' });
+  loadTasks();
+}
+
+// --- Stats ---
+async function loadStats() {
+  const res = await fetch('/api/stats');
+  const s = await res.json();
+  document.getElementById('statTasks').textContent = `${s.done || 0}/${s.total_tasks || 0}`;
+  const totalTok = (s.total_input_tokens || 0) + (s.total_output_tokens || 0);
+  document.getElementById('statTokens').textContent = totalTok > 1000 ? `${(totalTok/1000).toFixed(1)}k` : totalTok;
+  document.getElementById('statCost').textContent = `$${(s.total_cost_usd || 0).toFixed(4)}`;
+  const sec = (s.total_latency_ms || 0) / 1000;
+  document.getElementById('statLatency').textContent = sec > 60 ? `${(sec/60).toFixed(1)}m` : `${sec.toFixed(0)}s`;
+}
+
+// --- Data Loading ---
+async function loadTasks() {
+  const res = await fetch('/api/tasks');
+  const list = await res.json();
+  tasks = {};
+  list.forEach(t => tasks[t.id] = t);
+  renderKanban();
+  updateAgents();
+  loadStats();
+}
+
+// --- SSE ---
+function connectSSE() {
+  const es = new EventSource(`/api/events?last_id=${lastEventId}`);
+  const dot = document.getElementById('connDot');
+  const txt = document.getElementById('connText');
+
+  es.onopen = () => { dot.classList.add('connected'); txt.textContent = 'live'; };
+  es.onerror = () => { dot.classList.remove('connected'); txt.textContent = 'reconnecting...'; };
+
+  es.onmessage = (e) => {
+    if (e.data.startsWith(':')) return;
+    try {
+      const ev = JSON.parse(e.data);
+      lastEventId = ev.id || lastEventId;
+
+      if (['task_started','task_done','task_blocked','task_cancelled'].includes(ev.event_type)) {
+        loadTasks();
+        if (selectedTaskId === ev.task_id) selectTask(ev.task_id);
+      } else if (['step_started','step_done','step_failed'].includes(ev.event_type)) {
+        if (selectedTaskId === ev.task_id) selectTask(ev.task_id);
+        loadStats();
+      } else if (ev.event_type === 'dispatch_started' || ev.event_type === 'dispatch_done') {
+        loadTasks();
+      }
+    } catch (err) {}
+  };
+}
+
+// --- Init ---
+initAgents();
+loadTasks();
+connectSSE();
+setInterval(loadStats, 15000);
+</script>
+</body>
+</html>

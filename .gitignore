@@ -19,3 +19,4 @@ runs/
 # Projects are separate repos, not part of the framework
 projects/*/
 .envrc
+dashboard.db
