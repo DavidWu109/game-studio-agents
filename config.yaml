@@ -3,7 +3,7 @@
 
 providers:
   sdk:
-    base_url: "https://REDACTED"
+    # base_url: override via ANTHROPIC_BASE_URL env var
     models:
       opus: "claude-opus-4-7"
       sonnet: "claude-sonnet-4-6"

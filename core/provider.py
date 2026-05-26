@@ -176,8 +176,10 @@ def run_sdk(prompt: str, system: str = "",
         else:
             max_tokens = 4096
 
-    cfg = _load_config()
-    base_url = cfg.get("providers", {}).get("sdk", {}).get("base_url")
+    base_url = os.environ.get("ANTHROPIC_BASE_URL", "")
+    if not base_url:
+        cfg = _load_config()
+        base_url = cfg.get("providers", {}).get("sdk", {}).get("base_url", "")
     client_kwargs: dict[str, Any] = {"api_key": api_key}
     if base_url:
         client_kwargs["base_url"] = base_url
